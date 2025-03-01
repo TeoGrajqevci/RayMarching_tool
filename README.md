@@ -105,8 +105,8 @@ Run the compiled binary from the build directory:
 - **Multiple Lights**  
   Allow multiple light sources with adjustable parameters (color, intensity, shadows, etc.).
 - **More Primitive Shapes**  
-  Expand the SDF primitive library (cubes, cylinders, cones, torus, etc.).
+  Expand the SDF primitive library.
 - **Advanced Material System**  
-  Enable advanced surface properties such as metallic, roughness, and texture mapping.
+  Enable advanced surface properties such as transmission, sheen and texture mapping.
 
 ---
