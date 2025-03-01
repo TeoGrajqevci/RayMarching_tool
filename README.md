@@ -1,3 +1,5 @@
+
+
 # Ray Marching Tool
 
 A **3D modeling application** written in **C++** and **OpenGL**, leveraging **Signed Distance Fields (SDFs)** to create, blend, and manipulate primitive shapes. This project provides an interactive environment where shapes can be added or removed, and blended using union, subtraction, and intersection—each with a customizable smooth factor. You can also change colors and lighting parameters on the fly.
@@ -44,59 +46,61 @@ A **3D modeling application** written in **C++** and **OpenGL**, leveraging **Si
 
 ## Getting Started
 
-Ces instructions vont vous aider à mettre en place une copie du projet sur votre machine locale pour le développement et les tests.
+These instructions will help you set up a copy of the project on your local machine for development and testing.
 
-### Prérequis
-- Compilateur C++ supportant C++11 ou supérieur (ex. gcc, clang ou MSVC).
-- CMake 3.11 ou supérieur.
-- Git pour cloner le dépôt (optionnel, mais recommandé).
+### Prerequisites
+- A C++ compiler supporting C++11 or later (e.g., gcc, clang, or MSVC).
+- CMake 3.11 or higher.
+- Git for cloning the repository (optional but recommended).
 
-### Clonage du dépôt
+### Cloning the Repository
+```bash
 git clone https://github.com/TeoGrajqevci/RayMarching_tool.git
 cd RayMarching_tool
+```
 
-### Créer un répertoire de build
-À partir de la racine du projet :
+### Creating a Build Directory
+From the root of the project:
 ```bash
 mkdir build
 cd build
 ```
 
-### Configuration avec CMake
-Lancez CMake pour configurer le projet et télécharger les dépendances externes (GLAD, ImGui, GLFW, stb) :
+### Configuring with CMake
+Run CMake to configure the project and download external dependencies (GLAD, ImGui, GLFW, stb):
 ```bash
 cmake ..
 ```
 
 ### Compilation
-Une fois la configuration terminée :
+Once the configuration is complete:
 ```bash
 make
 ```
 
-Après la compilation, vous obtiendrez un exécutable nommé RayMarchingTool (ou le nom défini dans le fichier CMake).
+After compilation, you will get an executable named `RayMarchingTool` (or the name defined in the CMake file).
 
-### Exécution
-Exécutez le binaire compilé depuis le répertoire build :
+### Execution
+Run the compiled binary from the build directory:
 ```bash
 ./RayMarchingTool
 ```
 
+---
+
 ## Roadmap
 
 - **HDRi Support**  
-  Implémenter correctement les environnement maps HDR pour un réalisme lumineux amélioré.
+  Implement proper HDR environment maps for improved lighting realism.
 - **Path Tracing Renderer**  
-  Développer un mode de path tracing optionnel pour un rendu offline de haute qualité.
+  Develop an optional path tracing mode for high-quality offline rendering.
 - **Additional Blend Modes**  
-  Expérimenter différentes opérations de fusion SDF au-delà de l'union, la soustraction et l'intersection.
+  Experiment with different SDF blend operations beyond union, subtraction, and intersection.
 - **Multiple Lights**  
-  Permettre plusieurs sources de lumière avec des paramètres ajustables (couleur, intensité, ombres, etc.).
+  Allow multiple light sources with adjustable parameters (color, intensity, shadows, etc.).
 - **More Primitive Shapes**  
-  Étendre la bibliothèque de primitives SDF (cubes, cylindres, cônes, torus, etc.).
+  Expand the SDF primitive library (cubes, cylinders, cones, torus, etc.).
 - **Advanced Material System**  
-  Activer des propriétés de surface avancées telles que le métallique, la rugosité et la cartographie de textures.
+  Enable advanced surface properties such as metallic, roughness, and texture mapping.
 
 ---
-
-
