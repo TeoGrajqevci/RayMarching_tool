@@ -6,13 +6,10 @@
 #include <algorithm>
 #include "Texture.h"
 
-// These extern declarations assume that camDistance, hdrTexture, and hdrLoaded are defined in main.cpp
 extern float camDistance;
 extern Texture hdrTexture;
 extern bool hdrLoaded;
 
-// -------------------------------------------------------------------------
-// Callback implementations
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
@@ -37,14 +34,11 @@ void drop_callback(GLFWwindow* window, int count, const char** paths)
         
         if (ext == "hdr" || ext == "exr") {
             if (hdrTexture.loadHDR(path)) {
-                // The file path is stored in hdrTexture.filePath and hdrLoaded is updated accordingly.
             }
         }
     }
 }
 
-// -------------------------------------------------------------------------
-// InputManager class method implementations.
 InputManager::InputManager()
 {
 }
