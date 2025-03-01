@@ -10,11 +10,12 @@ A **3D modeling application** written in **C++** and **OpenGL**, leveraging **Si
 
 ## Table of Contents
 
-1. [Features](#features)  
-2. [Getting Started](#getting-started)  
-3. [Building from Source](#building-from-source)  
-4. [Usage](#usage)  
-5. [Roadmap](#roadmap)  
+1. [Features](#features)
+2. [Preview](#preview)
+3. [Getting Started](#getting-started)  
+4. [Building from Source](#building-from-source)  
+5. [Usage](#usage)  
+6. [Roadmap](#roadmap)  
 
 ---
 
@@ -34,12 +35,18 @@ A **3D modeling application** written in **C++** and **OpenGL**, leveraging **Si
 
 - **Interactive Interface**  
   - Real-time feedback using an ImGui-based GUI.
-  - Transform shapes (translate, rotate, scale) via a user-friendly interface.
+  - Transform shapes (translate, rotate, scale) via a user-friendly interface and key-bingings.
 
 - **Rendering**  
   - OpenGL raster-based rendering (improvements in progress).
   - **HDRi support** (in progress).
   - **Path tracing renderer** (in progress).
+
+---
+
+## Preview
+
+![RayMarchinTool](https://github.com/user-attachments/assets/a2c211f0-e0d0-4584-a530-af325847e369)
 
 ---
 
