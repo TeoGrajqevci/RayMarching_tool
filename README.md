@@ -11,11 +11,10 @@ A **3D modeling application** written in **C++** and **OpenGL**, leveraging **Si
 ## Table of Contents
 
 1. [Features](#features)  
-2. [Preview](#preview)  
-3. [Getting Started](#getting-started)  
-4. [Building from Source](#building-from-source)  
-5. [Usage](#usage)  
-6. [Roadmap](#roadmap)  
+2. [Getting Started](#getting-started)  
+3. [Building from Source](#building-from-source)  
+4. [Usage](#usage)  
+5. [Roadmap](#roadmap)  
 
 ---
 
