@@ -11,9 +11,9 @@ enum BlendMode { BLEND_NONE = 0, BLEND_SMOOTH_UNION = 1, BLEND_SMOOTH_SUBTRACTIO
 struct Shape {
     int type;
     float center[3];
-    float param[3]; // For sphere: radius; for box: half–extents; etc.
-    float rotation[3]; // Euler angles (radians)
-    float extra; // Additional parameter (e.g., roundness for round box)
+    float param[3]; 
+    float rotation[3]; 
+    float extra; 
     std::string name;
     int blendOp; // 0: None, 1: Smooth Union, 2: Smooth Subtraction, 3: Smooth Intersection
     float smoothness;
@@ -22,7 +22,6 @@ struct Shape {
     float roughness;
 };
 
-// CPU–side SDF functions and helpers
 float sdSphereCPU(const float p[3], const Shape &shape);
 float sdBoxCPU(const float p[3], const Shape &shape);
 float sdRoundBoxCPU(const float p[3], const Shape &shape);
