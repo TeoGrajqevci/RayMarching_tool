@@ -21,7 +21,7 @@ A **3D modeling application** written in **C++** and **OpenGL**, leveraging **Si
 ## Features
 
 - **SDF Modeling**  
-  - Add or remove primitive shapes (currently spheres, with more on the way).
+  - Add or remove primitive shapes (currently sphere, round box, cylinder, torus, with more on the way).
   - Apply blending operations: **Union**, **Subtract**, **Intersect**.
   - Control blending smoothness per shape.
 
