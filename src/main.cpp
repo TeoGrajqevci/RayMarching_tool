@@ -10,38 +10,31 @@
 #include <sstream>
 #include <cstddef>
 
-// Our own headers
 #include "Shader.h"
 #include "Texture.h"
 #include "ImGuiLayer.h"
 #include "Shapes.h"
-#include "Input.h"         // Now includes the InputManager class and callbacks
+#include "Input.h"         
 #include "Utilities.h"
-#include "GuiManager.h"    // Include our new GUI manager header
+#include "GuiManager.h"    
 
-// ImGui headers (ensure these are in your include path)
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-// Include the separated Renderer header
 #include "Renderer.h"
 
-// -------------------------------------------------------------------------
-// Global definitions required by other translation units
 float camDistance = 3.0f;
 Texture hdrTexture;
 bool hdrLoaded = false;
 
-// -------------------------------------------------------------------------
-// Helper function to update camera position using spherical coordinates.
+
 void updateCameraPosition(float camDistance, float camTheta, float camPhi, const float cameraTarget[3], float cameraPos[3])
 {
-    // Assuming sphericalToCartesian() is defined in Utilities.h
     sphericalToCartesian(camDistance, camTheta, camPhi, cameraTarget, cameraPos);
 }
 
-// -------------------------------------------------------------------------
+
 int main()
 {
     // --- 1. Initialize GLFW and GLAD ---
@@ -151,7 +144,6 @@ int main()
     bool showHelpPopup = false;
     ImVec2 helpButtonPos;
 
-    // --- Create our helper managers ---
     InputManager inputManager;
     GUIManager guiManager;
     TransformationState transformState;
