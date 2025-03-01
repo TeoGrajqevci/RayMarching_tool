@@ -1,4 +1,3 @@
-
 # Ray Marching Tool
 
 A **3D modeling application** written in **C++** and **OpenGL**, leveraging **Signed Distance Fields (SDFs)** to create, blend, and manipulate primitive shapes. This project provides an interactive environment where shapes can be added or removed, and blended using union, subtraction, and intersection—each with a customizable smooth factor. You can also change colors and lighting parameters on the fly.
@@ -15,9 +14,6 @@ A **3D modeling application** written in **C++** and **OpenGL**, leveraging **Si
 4. [Building from Source](#building-from-source)  
 5. [Usage](#usage)  
 6. [Roadmap](#roadmap)  
-7. [Contributing](#contributing)  
-8. [License](#license)  
-9. [CMakeLists.txt Reference](#cmakeliststxt-reference)
 
 ---
 
@@ -43,7 +39,64 @@ A **3D modeling application** written in **C++** and **OpenGL**, leveraging **Si
   - OpenGL raster-based rendering (improvements in progress).
   - **HDRi support** (in progress).
   - **Path tracing renderer** (in progress).
-  - 
+
+---
+
+## Getting Started
+
+Ces instructions vont vous aider à mettre en place une copie du projet sur votre machine locale pour le développement et les tests.
+
+### Prérequis
+- Compilateur C++ supportant C++11 ou supérieur (ex. gcc, clang ou MSVC).
+- CMake 3.11 ou supérieur.
+- Git pour cloner le dépôt (optionnel, mais recommandé).
+
+### Clonage du dépôt
+git clone https://github.com/TeoGrajqevci/RayMarching_tool.git
+cd RayMarching_tool
+
+### Créer un répertoire de build
+À partir de la racine du projet :
+```bash
+mkdir build
+cd build
+```
+
+### Configuration avec CMake
+Lancez CMake pour configurer le projet et télécharger les dépendances externes (GLAD, ImGui, GLFW, stb) :
+```bash
+cmake ..
+```
+
+### Compilation
+Une fois la configuration terminée :
+```bash
+make
+```
+
+Après la compilation, vous obtiendrez un exécutable nommé RayMarchingTool (ou le nom défini dans le fichier CMake).
+
+### Exécution
+Exécutez le binaire compilé depuis le répertoire build :
+```bash
+./RayMarchingTool
+```
+
+## Roadmap
+
+- **HDRi Support**  
+  Implémenter correctement les environnement maps HDR pour un réalisme lumineux amélioré.
+- **Path Tracing Renderer**  
+  Développer un mode de path tracing optionnel pour un rendu offline de haute qualité.
+- **Additional Blend Modes**  
+  Expérimenter différentes opérations de fusion SDF au-delà de l'union, la soustraction et l'intersection.
+- **Multiple Lights**  
+  Permettre plusieurs sources de lumière avec des paramètres ajustables (couleur, intensité, ombres, etc.).
+- **More Primitive Shapes**  
+  Étendre la bibliothèque de primitives SDF (cubes, cylindres, cônes, torus, etc.).
+- **Advanced Material System**  
+  Activer des propriétés de surface avancées telles que le métallique, la rugosité et la cartographie de textures.
+
 ---
 
 
