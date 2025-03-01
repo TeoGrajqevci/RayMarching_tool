@@ -1,5 +1,5 @@
 
-# RefactoredProject
+# Ray Marching Tool
 
 A **3D modeling application** written in **C++** and **OpenGL**, leveraging **Signed Distance Fields (SDFs)** to create, blend, and manipulate primitive shapes. This project provides an interactive environment where shapes can be added or removed, and blended using union, subtraction, and intersection—each with a customizable smooth factor. You can also change colors and lighting parameters on the fly.
 
@@ -43,28 +43,7 @@ A **3D modeling application** written in **C++** and **OpenGL**, leveraging **Si
   - OpenGL raster-based rendering (improvements in progress).
   - **HDRi support** (in progress).
   - **Path tracing renderer** (in progress).
-
+  - 
 ---
-
-## Preview
-
-Below is a screenshot demonstrating the current interface. You can see a **sphere** in the scene, the **GUI** panels for lighting and shape parameters, and a **shape directory** for managing your objects:
-
-![RefactoredProject Screenshot](https://via.placeholder.com/800x600?text=RefactoredProject+Preview)
-
-*(Replace the above link with your actual screenshot or remove if hosting images directly in the repository.)*
-
----
-
-## Getting Started
-
-These instructions will help you get a copy of the project up and running on your local machine for development and testing purposes.
-
-### Prerequisites
-
-- **C++ Compiler** supporting C++11 or later (e.g., `gcc`, `clang`, or MSVC).
-- **CMake** 3.11 or higher.
-- **Git** for cloning the repository (optional, but recommended).
-
 
 
