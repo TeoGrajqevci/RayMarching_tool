@@ -7,17 +7,12 @@
 #include <cmath>
 #include <algorithm>
 
-// Forward declare GLFWwindow instead of including GLFW/glfw3.h
 struct GLFWwindow;
 
-// Include Shapes for the Shape type.
 #include "Shapes.h"
 
-// Include ImGui header (required for inline calls to ImGui functions)
 #include "imgui.h"
 
-// -------------------------------------------------------------------------
-// Transformation state for handling translation, rotation and scale modes.
 struct TransformationState {
     bool translationModeActive = false;
     bool rotationModeActive = false;
@@ -43,8 +38,6 @@ struct TransformationState {
     bool scaleKeyHandled = false;
 };
 
-// -------------------------------------------------------------------------
-// InputManager class: handles key input, transformation mode activation/updates, mouse picking & camera drag.
 class InputManager {
 public:
     InputManager();
@@ -61,8 +54,6 @@ public:
                                           bool& mouseWasPressed);
 };
 
-// -------------------------------------------------------------------------
-// Callback function declarations.
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void drop_callback(GLFWwindow* window, int count, const char** paths);
