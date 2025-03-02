@@ -16,6 +16,7 @@ struct SDFResult {
 // --- New uniform arrays for PBR parameters ---
 uniform float shapeMetallic[50];
 uniform float shapeRoughness[50];
+uniform vec3 shapeAlbedos[50];
 // --- HDR Environment Map Uniforms ---
 uniform sampler2D hdrTexture;
 uniform bool useHdrBackground;
@@ -31,8 +32,6 @@ uniform vec3 shapeRotations[50];
 // NEW: Blend mode parameters per shape
 uniform float shapeSmoothness[50];
 uniform int shapeBlendOp[50];     // 0: None, 1: Smooth Union, 2: Smooth Subtraction, 3: Smooth Intersection
-// NEW: Material uniforms per shape
-uniform vec3 shapeAlbedos[50];
 // --- Selected shapes uniforms (for outline raymarching) ---
 uniform int uSelectedCount;
 uniform int uSelectedTypes[50];
@@ -112,7 +111,6 @@ float sdBoxRotated(vec3 p, vec3 halfExtents, vec3 rotation) {
     vec3 d = abs(localP) - halfExtents;
     return length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
 }
-// ----- New SDF Functions -----
 float sdRoundBox(vec3 p, vec3 b, float r) {
     vec3 q = abs(p) - b;
     return length(max(q, 0.0)) - r + min(max(q.x, max(q.y, q.z)), 0.0);

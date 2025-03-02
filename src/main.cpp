@@ -72,7 +72,8 @@ int main()
     ImGuiLayer::Init(window);
 
     // --- 3. Compile shader ---
-    Shader shader("shaders/vertex.glsl", "shaders/fragment.glsl");
+    Shader shader("shaders/vertex.glsl", "shaders/Solid_renderer.glsl");
+    // Shader shader("shaders/vertex.glsl", "shaders/Pathtracer.glsl");
 
     // --- 4. Set up full-screen quad ---
     float quadVertices[] = {
