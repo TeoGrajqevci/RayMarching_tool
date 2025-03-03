@@ -82,6 +82,11 @@ Once the configuration is complete:
 ```bash
 make
 ```
+or 
+```bash
+cmake --build .
+```
+
 
 After compilation, you will get an executable named `RayMarchingTool` (or the name defined in the CMake file).
 
