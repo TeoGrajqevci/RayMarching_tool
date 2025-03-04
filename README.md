@@ -88,7 +88,7 @@ cmake --build .
 ```
 
 
-After compilation, you will get an executable named `RayMarchingTool` (or the name defined in the CMake file).
+After compilation, you will get an executable named `RayMarchingTool`.
 
 ### Execution
 Run the compiled binary from the build directory:
