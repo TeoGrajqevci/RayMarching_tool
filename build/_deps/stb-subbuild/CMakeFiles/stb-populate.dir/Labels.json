@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/CMakeFiles/stb-populate"
+		},
+		{
+			"file" : "/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/CMakeFiles/stb-populate.rule"
+		},
+		{
+			"file" : "/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/CMakeFiles/stb-populate-complete.rule"
+		},
+		{
+			"file" : "/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/stb-populate-prefix/src/stb-populate-stamp/stb-populate-build.rule"
+		},
+		{
+			"file" : "/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/stb-populate-prefix/src/stb-populate-stamp/stb-populate-configure.rule"
+		},
+		{
+			"file" : "/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/stb-populate-prefix/src/stb-populate-stamp/stb-populate-download.rule"
+		},
+		{
+			"file" : "/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/stb-populate-prefix/src/stb-populate-stamp/stb-populate-install.rule"
+		},
+		{
+			"file" : "/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/stb-populate-prefix/src/stb-populate-stamp/stb-populate-mkdir.rule"
+		},
+		{
+			"file" : "/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/stb-populate-prefix/src/stb-populate-stamp/stb-populate-patch.rule"
+		},
+		{
+			"file" : "/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/stb-populate-prefix/src/stb-populate-stamp/stb-populate-test.rule"
+		},
+		{
+			"file" : "/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/stb-populate-prefix/src/stb-populate-stamp/stb-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"stb-populate"
+		],
+		"name" : "stb-populate"
+	}
+}

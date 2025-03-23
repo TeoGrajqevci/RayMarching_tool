@@ -1,0 +1,14 @@
+# Target labels
+ stb-populate
+# Source files and their labels
+/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/CMakeFiles/stb-populate
+/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/CMakeFiles/stb-populate.rule
+/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/CMakeFiles/stb-populate-complete.rule
+/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/stb-populate-prefix/src/stb-populate-stamp/stb-populate-build.rule
+/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/stb-populate-prefix/src/stb-populate-stamp/stb-populate-configure.rule
+/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/stb-populate-prefix/src/stb-populate-stamp/stb-populate-download.rule
+/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/stb-populate-prefix/src/stb-populate-stamp/stb-populate-install.rule
+/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/stb-populate-prefix/src/stb-populate-stamp/stb-populate-mkdir.rule
+/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/stb-populate-prefix/src/stb-populate-stamp/stb-populate-patch.rule
+/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/stb-populate-prefix/src/stb-populate-stamp/stb-populate-test.rule
+/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/stb-populate-prefix/src/stb-populate-stamp/stb-populate-update.rule
