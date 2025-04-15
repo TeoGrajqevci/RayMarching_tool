@@ -1,3 +1,0 @@
-/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/CMakeFiles/stb-populate.dir
-/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/CMakeFiles/edit_cache.dir
-/Users/teograjqevci/dev/RayMarching_tool/build/_deps/stb-subbuild/CMakeFiles/rebuild_cache.dir
