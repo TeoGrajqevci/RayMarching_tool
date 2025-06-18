@@ -1,4 +1,10 @@
 cmake_minimum_required(VERSION 3.11)
+
+# Set policy to handle compatibility with older CMake versions in dependencies
+if(POLICY CMP0048)
+    cmake_policy(SET CMP0048 NEW)
+endif()
+
 project(RayMarchingTool)
 
 set(CMAKE_CXX_STANDARD 11)
@@ -12,7 +18,7 @@ include(FetchContent)
 FetchContent_Declare(
     glad
     GIT_REPOSITORY https://github.com/Dav1dde/glad.git
-
+    GIT_TAG v0.1.36  # Use a stable v0.x version compatible with your project structure
 )
 FetchContent_MakeAvailable(glad)
 
