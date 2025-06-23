@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.11)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 
 # Set policy to handle compatibility with older CMake versions in dependencies
 if(POLICY CMP0048)
