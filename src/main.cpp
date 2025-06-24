@@ -119,6 +119,7 @@ int main()
     initialSphere.param[0] = 0.5f;
     initialSphere.param[1] = initialSphere.param[2] = 0.0f;
     initialSphere.rotation[0] = initialSphere.rotation[1] = initialSphere.rotation[2] = 0.0f;
+    initialSphere.scale[0] = initialSphere.scale[1] = initialSphere.scale[2] = 1.0f;
     initialSphere.extra = 0.0f;
     initialSphere.name = "0";
     initialSphere.blendOp = BLEND_NONE;

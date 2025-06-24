@@ -14,6 +14,7 @@ struct Shape {
     float param[3]; 
     float rotation[3]; 
     float extra; 
+    float scale[3];  // Non-uniform scaling per axis
     std::string name;
     int blendOp; // 0: None, 1: Smooth Union, 2: Smooth Subtraction, 3: Smooth Intersection
     float smoothness;

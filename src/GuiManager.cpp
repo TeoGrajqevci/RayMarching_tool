@@ -46,6 +46,7 @@ void GUIManager::renderGUI(GLFWwindow* window, std::vector<Shape>& shapes, std::
             newShape.param[0] = 0.5f;
             newShape.param[1] = newShape.param[2] = 0.0f;
             newShape.rotation[0] = newShape.rotation[1] = newShape.rotation[2] = 0.0f;
+            newShape.scale[0] = newShape.scale[1] = newShape.scale[2] = 1.0f;
             newShape.extra = 0.0f;
             newShape.blendOp = BLEND_NONE;
             newShape.smoothness = 0.1f;
@@ -63,6 +64,7 @@ void GUIManager::renderGUI(GLFWwindow* window, std::vector<Shape>& shapes, std::
             newShape.center[0] = newShape.center[1] = newShape.center[2] = 0.0f;
             newShape.param[0] = newShape.param[1] = newShape.param[2] = 0.5f;
             newShape.rotation[0] = newShape.rotation[1] = newShape.rotation[2] = 0.0f;
+            newShape.scale[0] = newShape.scale[1] = newShape.scale[2] = 1.0f;
             newShape.extra = 0.0f;
             newShape.blendOp = BLEND_NONE;
             newShape.smoothness = 0.1f;
@@ -80,6 +82,7 @@ void GUIManager::renderGUI(GLFWwindow* window, std::vector<Shape>& shapes, std::
             newShape.center[0] = newShape.center[1] = newShape.center[2] = 0.0f;
             newShape.param[0] = newShape.param[1] = newShape.param[2] = 0.5f;
             newShape.rotation[0] = newShape.rotation[1] = newShape.rotation[2] = 0.0f;
+            newShape.scale[0] = newShape.scale[1] = newShape.scale[2] = 1.0f;
             newShape.extra = 0.1f;
             newShape.blendOp = BLEND_NONE;
             newShape.smoothness = 0.1f;
@@ -99,6 +102,7 @@ void GUIManager::renderGUI(GLFWwindow* window, std::vector<Shape>& shapes, std::
             newShape.param[1] = 0.2f;
             newShape.param[2] = 0.0f;
             newShape.rotation[0] = newShape.rotation[1] = newShape.rotation[2] = 0.0f;
+            newShape.scale[0] = newShape.scale[1] = newShape.scale[2] = 1.0f;
             newShape.extra = 0.0f;
             newShape.blendOp = BLEND_NONE;
             newShape.smoothness = 0.1f;
@@ -118,6 +122,7 @@ void GUIManager::renderGUI(GLFWwindow* window, std::vector<Shape>& shapes, std::
             newShape.param[1] = 0.5f;
             newShape.param[2] = 0.0f;
             newShape.rotation[0] = newShape.rotation[1] = newShape.rotation[2] = 0.0f;
+            newShape.scale[0] = newShape.scale[1] = newShape.scale[2] = 1.0f;
             newShape.extra = 0.0f;
             newShape.blendOp = BLEND_NONE;
             newShape.smoothness = 0.1f;

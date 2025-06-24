@@ -46,6 +46,10 @@ void InputManager::processGeneralInput(GLFWwindow* window, std::vector<Shape>& s
                 if (idx >= 0 && idx < static_cast<int>(shapes.size())) {
                     Shape duplicateShape = shapes[idx];
                     duplicateShape.name += " Cp";
+                    // S'assurer que les échelles sont copiées correctement
+                    duplicateShape.scale[0] = shapes[idx].scale[0];
+                    duplicateShape.scale[1] = shapes[idx].scale[1];
+                    duplicateShape.scale[2] = shapes[idx].scale[2];
                     shapes.push_back(duplicateShape);
                     newSelection.push_back(static_cast<int>(shapes.size()) - 1);
                 }
@@ -155,8 +159,8 @@ void InputManager::processTransformationModeActivation(GLFWwindow* window, std::
             glfwGetCursorPos(window, &ts.scaleStartMouseX, &ts.scaleStartMouseY);
             ts.scaleOriginalParams.clear();
             for (int idx : selectedShapes) {
-                std::array<float, 3> param = { shapes[idx].param[0], shapes[idx].param[1], shapes[idx].param[2] };
-                ts.scaleOriginalParams.push_back(param);
+                std::array<float, 3> scale = { shapes[idx].scale[0], shapes[idx].scale[1], shapes[idx].scale[2] };
+                ts.scaleOriginalParams.push_back(scale);
             }
         }
     }
@@ -371,12 +375,20 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
         {
             for (size_t i = 0; i < selectedShapes.size(); i++) {
                 int idx = selectedShapes[i];
+                float scaleFactor = 1.0f + static_cast<float>(deltaY) * sensitivity;
+                
+                // Restaurer les valeurs originales pour tous les axes
+                shapes[idx].scale[0] = ts.scaleOriginalParams[i][0];
+                shapes[idx].scale[1] = ts.scaleOriginalParams[i][1];
+                shapes[idx].scale[2] = ts.scaleOriginalParams[i][2];
+                
+                // Appliquer la mise à l'échelle seulement sur l'axe sélectionné
                 if (ts.scaleAxis == 0)
-                    shapes[idx].param[0] = ts.scaleOriginalParams[i][0] * (1.0f + static_cast<float>(deltaY) * sensitivity);
+                    shapes[idx].scale[0] = ts.scaleOriginalParams[i][0] * scaleFactor;
                 else if (ts.scaleAxis == 1)
-                    shapes[idx].param[1] = ts.scaleOriginalParams[i][1] * (1.0f + static_cast<float>(deltaY) * sensitivity);
+                    shapes[idx].scale[1] = ts.scaleOriginalParams[i][1] * scaleFactor;
                 else if (ts.scaleAxis == 2)
-                    shapes[idx].param[2] = ts.scaleOriginalParams[i][2] * (1.0f + static_cast<float>(deltaY) * sensitivity);
+                    shapes[idx].scale[2] = ts.scaleOriginalParams[i][2] * scaleFactor;
             }
         }
         else
@@ -384,9 +396,9 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
             float scaleFactor = 1.0f + static_cast<float>(deltaY) * sensitivity;
             for (size_t i = 0; i < selectedShapes.size(); i++) {
                 int idx = selectedShapes[i];
-                shapes[idx].param[0] = ts.scaleOriginalParams[i][0] * scaleFactor;
-                shapes[idx].param[1] = ts.scaleOriginalParams[i][1] * scaleFactor;
-                shapes[idx].param[2] = ts.scaleOriginalParams[i][2] * scaleFactor;
+                shapes[idx].scale[0] = ts.scaleOriginalParams[i][0] * scaleFactor;
+                shapes[idx].scale[1] = ts.scaleOriginalParams[i][1] * scaleFactor;
+                shapes[idx].scale[2] = ts.scaleOriginalParams[i][2] * scaleFactor;
             }
         }
         if (!ts.scaleConstrained && !ImGui::GetIO().WantCaptureKeyboard)
@@ -398,7 +410,9 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
                 glfwGetCursorPos(window, &ts.scaleStartMouseX, &ts.scaleStartMouseY);
                 for (size_t i = 0; i < selectedShapes.size(); i++) {
                     int idx = selectedShapes[i];
-                    ts.scaleOriginalParams[i][0] = shapes[idx].param[0];
+                    ts.scaleOriginalParams[i][0] = shapes[idx].scale[0];
+                    ts.scaleOriginalParams[i][1] = shapes[idx].scale[1];
+                    ts.scaleOriginalParams[i][2] = shapes[idx].scale[2];
                 }
             }
             else if (glfwGetKey(window, GLFW_KEY_Y) == GLFW_PRESS)
@@ -408,7 +422,9 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
                 glfwGetCursorPos(window, &ts.scaleStartMouseX, &ts.scaleStartMouseY);
                 for (size_t i = 0; i < selectedShapes.size(); i++) {
                     int idx = selectedShapes[i];
-                    ts.scaleOriginalParams[i][1] = shapes[idx].param[1];
+                    ts.scaleOriginalParams[i][0] = shapes[idx].scale[0];
+                    ts.scaleOriginalParams[i][1] = shapes[idx].scale[1];
+                    ts.scaleOriginalParams[i][2] = shapes[idx].scale[2];
                 }
             }
             else if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS)
@@ -418,7 +434,9 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
                 glfwGetCursorPos(window, &ts.scaleStartMouseX, &ts.scaleStartMouseY);
                 for (size_t i = 0; i < selectedShapes.size(); i++) {
                     int idx = selectedShapes[i];
-                    ts.scaleOriginalParams[i][2] = shapes[idx].param[2];
+                    ts.scaleOriginalParams[i][0] = shapes[idx].scale[0];
+                    ts.scaleOriginalParams[i][1] = shapes[idx].scale[1];
+                    ts.scaleOriginalParams[i][2] = shapes[idx].scale[2];
                 }
             }
         }
@@ -431,9 +449,9 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
         {
             for (size_t i = 0; i < selectedShapes.size(); i++) {
                 int idx = selectedShapes[i];
-                shapes[idx].param[0] = ts.scaleOriginalParams[i][0];
-                shapes[idx].param[1] = ts.scaleOriginalParams[i][1];
-                shapes[idx].param[2] = ts.scaleOriginalParams[i][2];
+                shapes[idx].scale[0] = ts.scaleOriginalParams[i][0];
+                shapes[idx].scale[1] = ts.scaleOriginalParams[i][1];
+                shapes[idx].scale[2] = ts.scaleOriginalParams[i][2];
             }
             ts.scaleModeActive = false;
             ts.scaleConstrained = false;

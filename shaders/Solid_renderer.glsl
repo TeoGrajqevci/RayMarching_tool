@@ -23,6 +23,7 @@ uniform int shapeTypes[50];       // 0: sphere, 1: box, 2: round box, 3: torus, 
 uniform vec3 shapeCenters[50];
 uniform vec4 shapeParams[50];
 uniform vec3 shapeRotations[50];
+uniform vec3 shapeScales[50];     // Non-uniform scaling per shape
 // NEW: Blend mode parameters per shape
 uniform float shapeSmoothness[50];
 uniform int shapeBlendOp[50];     // 0: None, 1: Smooth Union, 2: Smooth Subtraction, 3: Smooth Intersection
@@ -32,6 +33,7 @@ uniform int uSelectedTypes[50];
 uniform vec3 uSelectedCenters[50];
 uniform vec4 uSelectedParams[50];
 uniform vec3 uSelectedRotations[50];
+uniform vec3 uSelectedScales[50];
 uniform float uOutlineThickness;
 // --- Lighting uniforms ---
 uniform vec3 lightDir;
@@ -97,10 +99,26 @@ vec3 rotate(vec3 p, vec3 angles) {
 float sdSphere(vec3 p, vec3 center, float radius) {
     return length(p - center) - radius;
 }
+
+// Ellipsoid SDF - allows non-uniform scaling
+float sdEllipsoid(vec3 p, vec3 center, vec3 radii) {
+    vec3 localP = p - center;
+    vec3 scaledP = localP / radii;
+    return (length(scaledP) - 1.0) * min(min(radii.x, radii.y), radii.z);
+}
 float sdBoxRotated(vec3 p, vec3 halfExtents, vec3 rotation) {
     vec3 localP = rotate(p, -rotation);
     vec3 d = abs(localP) - halfExtents;
     return length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
+}
+
+// Box with non-uniform scaling
+float sdBoxScaled(vec3 p, vec3 center, vec3 halfExtents, vec3 scale, vec3 rotation) {
+    vec3 localP = (p - center) / scale;
+    localP = rotate(localP, -rotation);
+    vec3 d = abs(localP) - halfExtents;
+    float boxDist = length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
+    return boxDist * min(min(scale.x, scale.y), scale.z);
 }
 float sdRoundBox(vec3 p, vec3 b, float r) {
     vec3 q = abs(p) - b;
@@ -110,6 +128,14 @@ float sdRoundBoxRotated(vec3 p, vec3 b, float r, vec3 rotation) {
     vec3 localP = rotate(p, -rotation);
     return sdRoundBox(localP, b, r);
 }
+
+// Round box with non-uniform scaling
+float sdRoundBoxScaled(vec3 p, vec3 center, vec3 halfExtents, float r, vec3 scale, vec3 rotation) {
+    vec3 localP = (p - center) / scale;
+    localP = rotate(localP, -rotation);
+    float roundBoxDist = sdRoundBox(localP, halfExtents, r / min(min(scale.x, scale.y), scale.z));
+    return roundBoxDist * min(min(scale.x, scale.y), scale.z);
+}
 float sdTorus(vec3 p, vec2 t) {
     vec2 q = vec2(length(p.xz) - t.x, p.y);
     return length(q) - t.y;
@@ -117,6 +143,17 @@ float sdTorus(vec3 p, vec2 t) {
 float sdTorusRotated(vec3 p, vec2 t, vec3 rotation) {
     vec3 localP = rotate(p, -rotation);
     return sdTorus(localP, t);
+}
+
+// Torus with non-uniform scaling (creates elliptical torus)
+float sdTorusScaled(vec3 p, vec3 center, vec2 t, vec3 scale, vec3 rotation) {
+    vec3 localP = (p - center) / scale;
+    localP = rotate(localP, -rotation);
+    // For torus, we need to adjust the radii based on XZ scaling for the major radius
+    // and Y scaling affects the tube radius
+    vec2 adjustedT = vec2(t.x / min(scale.x, scale.z), t.y / scale.y);
+    float torusDist = sdTorus(localP, adjustedT);
+    return torusDist * min(min(scale.x, scale.y), scale.z);
 }
 float sdCylinder(vec3 p, float r, float h) {
     vec2 d = vec2(length(p.xz) - r, abs(p.y) - h);
@@ -126,18 +163,32 @@ float sdCylinderRotated(vec3 p, float r, float h, vec3 rotation) {
     vec3 localP = rotate(p, -rotation);
     return sdCylinder(localP, r, h);
 }
+
+// Cylinder with non-uniform scaling (creates elliptical cylinder)
+float sdCylinderScaled(vec3 p, vec3 center, float r, float h, vec3 scale, vec3 rotation) {
+    vec3 localP = (p - center) / scale;
+    localP = rotate(localP, -rotation);
+    // For cylinder, XZ scaling affects the radius, Y scaling affects the height
+    float adjustedR = r / min(scale.x, scale.z);
+    float adjustedH = h / scale.y;
+    float cylinderDist = sdCylinder(localP, adjustedR, adjustedH);
+    return cylinderDist * min(min(scale.x, scale.y), scale.z);
+}
 // ----- Acceleration Helper: Bounding Radius per Shape -----
 float shapeBoundingRadius(int i) {
-    if (shapeTypes[i] == 0) { // Sphere
-         return shapeParams[i].w;
+    vec3 scale = shapeScales[i];
+    float maxScale = max(max(scale.x, scale.y), scale.z);
+    
+    if (shapeTypes[i] == 0) { // Sphere/Ellipsoid
+         return shapeParams[i].w * maxScale;
     } else if (shapeTypes[i] == 1) { // Box
-         return length(shapeParams[i].xyz);
+         return length(shapeParams[i].xyz) * maxScale;
     } else if (shapeTypes[i] == 2) { // Round Box
-         return length(shapeParams[i].xyz) + shapeParams[i].w;
+         return (length(shapeParams[i].xyz) + shapeParams[i].w) * maxScale;
     } else if (shapeTypes[i] == 3) { // Torus
-         return shapeParams[i].x + shapeParams[i].y;
+         return (shapeParams[i].x + shapeParams[i].y) * maxScale;
     } else if (shapeTypes[i] == 4) { // Cylinder
-         return sqrt(shapeParams[i].x * shapeParams[i].x + shapeParams[i].y * shapeParams[i].y);
+         return sqrt(shapeParams[i].x * shapeParams[i].x + shapeParams[i].y * shapeParams[i].y) * maxScale;
     }
     return MAX_DIST;
 }
@@ -145,16 +196,18 @@ float shapeBoundingRadius(int i) {
 SDFResult sdfForShape(int i, vec3 p) {
     SDFResult res;
     float d = MAX_DIST;
-    if (shapeTypes[i] == 0) { // Sphere
-         d = sdSphere(p, shapeCenters[i], shapeParams[i].w);
-    } else if (shapeTypes[i] == 1) { // Box
-         d = sdBoxRotated(p - shapeCenters[i], shapeParams[i].xyz, shapeRotations[i]);
-    } else if (shapeTypes[i] == 2) { // Round Box
-         d = sdRoundBoxRotated(p - shapeCenters[i], shapeParams[i].xyz, shapeParams[i].w, shapeRotations[i]);
-    } else if (shapeTypes[i] == 3) { // Torus
-         d = sdTorusRotated(p - shapeCenters[i], vec2(shapeParams[i].x, shapeParams[i].y), shapeRotations[i]);
-    } else if (shapeTypes[i] == 4) { // Cylinder
-         d = sdCylinderRotated(p - shapeCenters[i], shapeParams[i].x, shapeParams[i].y, shapeRotations[i]);
+    vec3 scale = shapeScales[i];
+    
+    if (shapeTypes[i] == 0) { // Sphere -> Ellipsoid
+         d = sdEllipsoid(p, shapeCenters[i], vec3(shapeParams[i].w) * scale);
+    } else if (shapeTypes[i] == 1) { // Box with scaling
+         d = sdBoxScaled(p, shapeCenters[i], shapeParams[i].xyz, scale, shapeRotations[i]);
+    } else if (shapeTypes[i] == 2) { // Round Box with scaling
+         d = sdRoundBoxScaled(p, shapeCenters[i], shapeParams[i].xyz, shapeParams[i].w, scale, shapeRotations[i]);
+    } else if (shapeTypes[i] == 3) { // Torus with scaling
+         d = sdTorusScaled(p, shapeCenters[i], vec2(shapeParams[i].x, shapeParams[i].y), scale, shapeRotations[i]);
+    } else if (shapeTypes[i] == 4) { // Cylinder with scaling
+         d = sdCylinderScaled(p, shapeCenters[i], shapeParams[i].x, shapeParams[i].y, scale, shapeRotations[i]);
     }
     res.dist = d;
     res.mat.albedo = shapeAlbedos[i];
@@ -214,16 +267,18 @@ float softShadow(vec3 ro, vec3 rd, float mint, float maxt, float k) {
 // ----- Selected Shape SDF Helper for given index (for edge detection) -----
 float selectedShapeSDFFor(int idx, vec3 p) {
     float d = MAX_DIST;
-    if (uSelectedTypes[idx] == 0) {
-         d = sdSphere(p, uSelectedCenters[idx], uSelectedParams[idx].w);
-    } else if (uSelectedTypes[idx] == 1) {
-         d = sdBoxRotated(p - uSelectedCenters[idx], uSelectedParams[idx].xyz, uSelectedRotations[idx]);
-    } else if (uSelectedTypes[idx] == 2) {
-         d = sdRoundBoxRotated(p - uSelectedCenters[idx], uSelectedParams[idx].xyz, uSelectedParams[idx].w, uSelectedRotations[idx]);
-    } else if (uSelectedTypes[idx] == 3) {
-         d = sdTorusRotated(p - uSelectedCenters[idx], vec2(uSelectedParams[idx].x, uSelectedParams[idx].y), uSelectedRotations[idx]);
-    } else if (uSelectedTypes[idx] == 4) {
-         d = sdCylinderRotated(p - uSelectedCenters[idx], uSelectedParams[idx].x, uSelectedParams[idx].y, uSelectedRotations[idx]);
+    vec3 scale = uSelectedScales[idx];
+    
+    if (uSelectedTypes[idx] == 0) { // Sphere -> Ellipsoid
+         d = sdEllipsoid(p, uSelectedCenters[idx], vec3(uSelectedParams[idx].w) * scale);
+    } else if (uSelectedTypes[idx] == 1) { // Box with scaling
+         d = sdBoxScaled(p, uSelectedCenters[idx], uSelectedParams[idx].xyz, scale, uSelectedRotations[idx]);
+    } else if (uSelectedTypes[idx] == 2) { // Round Box with scaling
+         d = sdRoundBoxScaled(p, uSelectedCenters[idx], uSelectedParams[idx].xyz, uSelectedParams[idx].w, scale, uSelectedRotations[idx]);
+    } else if (uSelectedTypes[idx] == 3) { // Torus with scaling
+         d = sdTorusScaled(p, uSelectedCenters[idx], vec2(uSelectedParams[idx].x, uSelectedParams[idx].y), scale, uSelectedRotations[idx]);
+    } else if (uSelectedTypes[idx] == 4) { // Cylinder with scaling
+         d = sdCylinderScaled(p, uSelectedCenters[idx], uSelectedParams[idx].x, uSelectedParams[idx].y, scale, uSelectedRotations[idx]);
     }
     return d;
 }

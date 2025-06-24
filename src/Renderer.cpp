@@ -34,6 +34,7 @@ void Renderer::renderScene(const std::vector<Shape>& shapes, const std::vector<i
     std::vector<float> centers(shapes.size() * 3);
     std::vector<float> params(shapes.size() * 4);
     std::vector<float> rotations(shapes.size() * 3);
+    std::vector<float> scales(shapes.size() * 3);
     std::vector<float> smoothnessArray(shapes.size());
     std::vector<int> blendOpArray(shapes.size());
     std::vector<float> albedos(shapes.size() * 3);
@@ -87,6 +88,9 @@ void Renderer::renderScene(const std::vector<Shape>& shapes, const std::vector<i
             rotations[i * 3 + 1] = shapes[i].rotation[1];
             rotations[i * 3 + 2] = shapes[i].rotation[2];
         }
+        scales[i * 3 + 0] = shapes[i].scale[0];
+        scales[i * 3 + 1] = shapes[i].scale[1];
+        scales[i * 3 + 2] = shapes[i].scale[2];
         smoothnessArray[i] = shapes[i].smoothness;
         blendOpArray[i] = shapes[i].blendOp;
         albedos[i * 3 + 0] = shapes[i].albedo[0];
@@ -99,6 +103,7 @@ void Renderer::renderScene(const std::vector<Shape>& shapes, const std::vector<i
     glUniform3fv(glGetUniformLocation(shader.ID, "shapeCenters"), static_cast<int>(centers.size()/3), centers.data());
     glUniform4fv(glGetUniformLocation(shader.ID, "shapeParams"), static_cast<int>(params.size()/4), params.data());
     glUniform3fv(glGetUniformLocation(shader.ID, "shapeRotations"), static_cast<int>(rotations.size()/3), rotations.data());
+    glUniform3fv(glGetUniformLocation(shader.ID, "shapeScales"), static_cast<int>(scales.size()/3), scales.data());
     glUniform1fv(glGetUniformLocation(shader.ID, "shapeSmoothness"), static_cast<int>(smoothnessArray.size()), smoothnessArray.data());
     glUniform1iv(glGetUniformLocation(shader.ID, "shapeBlendOp"), static_cast<int>(blendOpArray.size()), blendOpArray.data());
     glUniform3fv(glGetUniformLocation(shader.ID, "shapeAlbedos"), static_cast<int>(albedos.size()/3), albedos.data());
@@ -111,6 +116,7 @@ void Renderer::renderScene(const std::vector<Shape>& shapes, const std::vector<i
     float selCenters[150] = {0.0f};
     float selParams[200] = {0.0f};
     float selRotations[150] = {0.0f};
+    float selScales[150] = {0.0f};
     for (size_t i = 0; i < selectedShapes.size() && i < 50; i++) {
         int idx = selectedShapes[i];
         selTypes[i] = shapes[idx].type;
@@ -160,11 +166,15 @@ void Renderer::renderScene(const std::vector<Shape>& shapes, const std::vector<i
             selRotations[i * 3 + 1] = shapes[idx].rotation[1];
             selRotations[i * 3 + 2] = shapes[idx].rotation[2];
         }
+        selScales[i * 3 + 0] = shapes[idx].scale[0];
+        selScales[i * 3 + 1] = shapes[idx].scale[1];
+        selScales[i * 3 + 2] = shapes[idx].scale[2];
     }
     glUniform1iv(glGetUniformLocation(shader.ID, "uSelectedTypes"), 50, selTypes);
     glUniform3fv(glGetUniformLocation(shader.ID, "uSelectedCenters"), 50, selCenters);
     glUniform4fv(glGetUniformLocation(shader.ID, "uSelectedParams"), 50, selParams);
     glUniform3fv(glGetUniformLocation(shader.ID, "uSelectedRotations"), 50, selRotations);
+    glUniform3fv(glGetUniformLocation(shader.ID, "uSelectedScales"), 50, selScales);
     shader.setFloat("uOutlineThickness", 0.015f);
     
     // Configuration des guides d'axe
