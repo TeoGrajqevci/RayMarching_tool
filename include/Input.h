@@ -36,6 +36,11 @@ struct TransformationState {
     bool translationKeyHandled = false;
     bool rotationKeyHandled = false;
     bool scaleKeyHandled = false;
+    
+    // Nouvelles données pour les guides d'axe
+    bool showAxisGuides = false;
+    int activeAxis = -1; // 0=X, 1=Y, 2=Z
+    float guideCenter[3] = {0.0f, 0.0f, 0.0f}; // Centre du guide (centre de la forme sélectionnée)
 };
 
 class InputManager {
@@ -43,7 +48,7 @@ public:
     InputManager();
     ~InputManager();
 
-    void processGeneralInput(GLFWwindow* window, std::vector<Shape>& shapes, std::vector<int>& selectedShapes, float cameraTarget[3], bool& showGUI, bool& altRenderMode);
+    void processGeneralInput(GLFWwindow* window, std::vector<Shape>& shapes, std::vector<int>& selectedShapes, float cameraTarget[3], bool& showGUI, bool& altRenderMode, const TransformationState& ts);
     void processTransformationModeActivation(GLFWwindow* window, std::vector<Shape>& shapes, std::vector<int>& selectedShapes, TransformationState& ts);
     void processTransformationUpdates(GLFWwindow* window, std::vector<Shape>& shapes, std::vector<int>& selectedShapes,
                                       TransformationState& ts, const float cameraPos[3], const float cameraTarget[3]);

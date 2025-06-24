@@ -146,7 +146,7 @@ int main()
     {
         glfwPollEvents();
 
-        inputManager.processGeneralInput(window, shapes, selectedShapes, cameraTarget, showGUI, altRenderMode);
+        inputManager.processGeneralInput(window, shapes, selectedShapes, cameraTarget, showGUI, altRenderMode, transformState);
         inputManager.processTransformationModeActivation(window, shapes, selectedShapes, transformState);
         inputManager.processTransformationUpdates(window, shapes, selectedShapes, transformState, cameraPos, cameraTarget);
         inputManager.processMousePickingAndCameraDrag(window, shapes, selectedShapes, cameraPos, cameraTarget,
@@ -172,7 +172,7 @@ int main()
         Renderer renderer(shader, VAO);
         renderer.renderScene(shapes, selectedShapes, lightDir, lightColor, ambientColor,
                              cameraPos, cameraTarget, display_w, display_h,
-                             altRenderMode, useGradientBackground);
+                             altRenderMode, useGradientBackground, transformState);
 
         if (showGUI)
             ImGuiLayer::Render();

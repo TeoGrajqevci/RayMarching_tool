@@ -6,6 +6,7 @@
 #include <array>
 #include "Shader.h"
 #include "Shapes.h"
+#include "Input.h" // Pour TransformationState
 
 class Renderer {
 public:
@@ -14,7 +15,8 @@ public:
                      const float lightDir[3], const float lightColor[3], const float ambientColor[3],
                      const float cameraPos[3], const float cameraTarget[3],
                      int display_w, int display_h,
-                     bool altRenderMode, bool useGradientBackground);
+                     bool altRenderMode, bool useGradientBackground,
+                     const TransformationState& transformState);
 private:
     Shader& shader;
     GLuint quadVAO;

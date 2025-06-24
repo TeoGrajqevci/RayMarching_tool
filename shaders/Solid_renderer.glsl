@@ -43,6 +43,11 @@ uniform vec3 cameraPos;
 uniform vec3 cameraTarget;
 // --- Background toggle ---
 uniform int uBackgroundGradient;
+
+// --- Axis Guide uniforms ---
+uniform int uShowAxisGuides;    // 0 ou 1 pour afficher les guides d'axe
+uniform int uActiveAxis;        // -1: aucun, 0: X, 1: Y, 2: Z
+uniform vec3 uGuideCenter;      // Centre du guide (centre de la forme sélectionnée)
 // ----- Constants -----
 const int MAX_STEPS = 100;
 const float MAX_DIST = 100.0;
@@ -255,6 +260,43 @@ vec3 AgXToneMapping(vec3 color) {
     vec3 result = mix(aces, color, 0.35);
     return result;
 }
+
+// ----- Axis Guide Line SDF -----
+float sdAxisLine(vec3 p, vec3 center, int axis) {
+    vec3 localP = p - center;
+    if (axis == 0) { // X axis
+        return length(localP.yz);
+    } else if (axis == 1) { // Y axis
+        return length(localP.xz);
+    } else if (axis == 2) { // Z axis
+        return length(localP.xy);
+    }
+    return MAX_DIST;
+}
+
+// ----- Raymarching for Axis Guide Lines -----
+vec4 rayMarchAxisGuide(vec3 ro, vec3 rd, vec3 center, int axis) {
+    const float maxDist = MAX_DIST;
+    const float minDist = 0.002;
+    const int maxIter = 64;
+    float dist = 0.0;
+    float lineWidth = 0.002; // Épaisseur de la ligne
+    
+    for (int i = 0; i < maxIter; i++) {
+        vec3 pos = ro + rd * dist;
+        float d = sdAxisLine(pos, center, axis) - lineWidth;
+        
+        if (d < minDist) {
+            return vec4(dist, 0.0, 1.0, 0.0); // Ligne trouvée
+        }
+        
+        dist += d;
+        if (dist > maxDist) break;
+    }
+    
+    return vec4(maxDist, 0.0, 0.0, 0.0); // Pas de ligne
+}
+
 // ----- Modified Main Image Function using a basic PBR model -----
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
@@ -318,6 +360,21 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
                  vec3 outlineColor = vec3(1.0, 0.5, 0.0);
                  color = mix(color, outlineColor, combinedEdge);
              }
+        }
+        
+        // Rendu des guides d'axe
+        if (uShowAxisGuides == 1 && uActiveAxis >= 0) {
+            vec4 axisGuide = rayMarchAxisGuide(ro, rd, uGuideCenter, uActiveAxis);
+            if (axisGuide.z > 0.0) {
+                vec3 axisColor = vec3(1.0, 0.0, 0.0); // Rouge par défaut
+                if (uActiveAxis == 0) axisColor = vec3(1.0, 0.0, 0.0);      // X = Rouge
+                else if (uActiveAxis == 1) axisColor = vec3(0.0, 0.0, 1.0); // Y = Bleu
+                else if (uActiveAxis == 2) axisColor = vec3(0.0, 1.0, 0.0); // Z = Vert
+                
+                // Mélanger avec la couleur existante
+                float axisIntensity = 0.4;
+                color = mix(color, axisColor, axisIntensity);
+            }
         }
         if (abs(rd.y) > 0.001) {
             float tPlane = -ro.y / rd.y;

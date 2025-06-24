@@ -14,7 +14,8 @@ void Renderer::renderScene(const std::vector<Shape>& shapes, const std::vector<i
                      const float lightDir[3], const float lightColor[3], const float ambientColor[3],
                      const float cameraPos[3], const float cameraTarget[3],
                      int display_w, int display_h,
-                     bool altRenderMode, bool useGradientBackground)
+                     bool altRenderMode, bool useGradientBackground,
+                     const TransformationState& transformState)
 {
     shader.use();
     shader.setInt("uRenderMode", altRenderMode ? 1 : 0);
@@ -165,6 +166,11 @@ void Renderer::renderScene(const std::vector<Shape>& shapes, const std::vector<i
     glUniform4fv(glGetUniformLocation(shader.ID, "uSelectedParams"), 50, selParams);
     glUniform3fv(glGetUniformLocation(shader.ID, "uSelectedRotations"), 50, selRotations);
     shader.setFloat("uOutlineThickness", 0.015f);
+    
+    // Configuration des guides d'axe
+    shader.setInt("uShowAxisGuides", transformState.showAxisGuides ? 1 : 0);
+    shader.setInt("uActiveAxis", transformState.activeAxis);
+    shader.setVec3("uGuideCenter", transformState.guideCenter[0], transformState.guideCenter[1], transformState.guideCenter[2]);
 
     glBindVertexArray(quadVAO);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);

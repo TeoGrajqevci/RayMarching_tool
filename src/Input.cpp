@@ -32,7 +32,7 @@ InputManager::~InputManager()
 {
 }
 
-void InputManager::processGeneralInput(GLFWwindow* window, std::vector<Shape>& shapes, std::vector<int>& selectedShapes, float cameraTarget[3], bool& showGUI, bool& altRenderMode)
+void InputManager::processGeneralInput(GLFWwindow* window, std::vector<Shape>& shapes, std::vector<int>& selectedShapes, float cameraTarget[3], bool& showGUI, bool& altRenderMode, const TransformationState& ts)
 {
     static bool duplicationKeyHandled = false;
     if (!ImGui::GetIO().WantCaptureKeyboard) {
@@ -58,7 +58,9 @@ void InputManager::processGeneralInput(GLFWwindow* window, std::vector<Shape>& s
     }
     if (!ImGui::GetIO().WantCaptureKeyboard && !selectedShapes.empty())
     {
-        if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
+        // Only allow deletion if no transformation mode is active
+        if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS && 
+            !ts.translationModeActive && !ts.rotationModeActive && !ts.scaleModeActive)
         {
             std::sort(selectedShapes.begin(), selectedShapes.end(), std::greater<int>());
             for (int idx : selectedShapes) {
@@ -108,6 +110,22 @@ void InputManager::processTransformationModeActivation(GLFWwindow* window, std::
             ts.translationConstrained = false;
             ts.translationAxis = -1;
             ts.translationKeyHandled = true;
+            ts.showAxisGuides = true; // Activer les guides d'axe
+            ts.activeAxis = -1; // Pas d'axe spécifique encore
+            
+            // Calculer le centre des formes sélectionnées pour les guides
+            if (!selectedShapes.empty()) {
+                float centerX = 0.0f, centerY = 0.0f, centerZ = 0.0f;
+                for (int idx : selectedShapes) {
+                    centerX += shapes[idx].center[0];
+                    centerY += shapes[idx].center[1];
+                    centerZ += shapes[idx].center[2];
+                }
+                ts.guideCenter[0] = centerX / selectedShapes.size();
+                ts.guideCenter[1] = centerY / selectedShapes.size();
+                ts.guideCenter[2] = centerZ / selectedShapes.size();
+            }
+            
             glfwGetCursorPos(window, &ts.translationStartMouseX, &ts.translationStartMouseY);
             ts.translationOriginalCenters.clear();
             for (int idx : selectedShapes) {
@@ -206,6 +224,7 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
             {
                 ts.translationConstrained = true;
                 ts.translationAxis = 0;
+                ts.activeAxis = 0; // Axe X actif pour les guides
                 glfwGetCursorPos(window, &ts.translationStartMouseX, &ts.translationStartMouseY);
                 for (size_t i = 0; i < selectedShapes.size(); i++) {
                     int idx = selectedShapes[i];
@@ -218,6 +237,7 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
             {
                 ts.translationConstrained = true;
                 ts.translationAxis = 1;
+                ts.activeAxis = 1; // Axe Y actif pour les guides
                 glfwGetCursorPos(window, &ts.translationStartMouseX, &ts.translationStartMouseY);
                 for (size_t i = 0; i < selectedShapes.size(); i++) {
                     int idx = selectedShapes[i];
@@ -230,6 +250,7 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
             {
                 ts.translationConstrained = true;
                 ts.translationAxis = 2;
+                ts.activeAxis = 2; // Axe Z actif pour les guides
                 glfwGetCursorPos(window, &ts.translationStartMouseX, &ts.translationStartMouseY);
                 for (size_t i = 0; i < selectedShapes.size(); i++) {
                     int idx = selectedShapes[i];
@@ -243,6 +264,8 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
         {
             ts.translationModeActive = false;
             ts.translationConstrained = false;
+            ts.showAxisGuides = false; // Désactiver les guides
+            ts.activeAxis = -1;
         }
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         {
@@ -254,6 +277,8 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
             }
             ts.translationModeActive = false;
             ts.translationConstrained = false;
+            ts.showAxisGuides = false; // Désactiver les guides
+            ts.activeAxis = -1;
         }
     }
     // Rotation mode update
@@ -422,6 +447,8 @@ void InputManager::processMousePickingAndCameraDrag(GLFWwindow* window, std::vec
                                                       bool& cameraDragging, double& lastMouseX, double& lastMouseY,
                                                       bool& mouseWasPressed)
 {
+    static bool panningMode = false;
+    
     if (!ImGui::GetIO().WantCaptureMouse && glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
     {
         double mouseX, mouseY;
@@ -431,8 +458,20 @@ void InputManager::processMousePickingAndCameraDrag(GLFWwindow* window, std::vec
             mouseWasPressed = true;
             lastMouseX = mouseX;
             lastMouseY = mouseY;
-            int fbWidth, fbHeight;
-            glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+            
+            // Check if Shift is pressed for panning mode
+            if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || 
+                glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
+            {
+                panningMode = true;
+                cameraDragging = true; // Start camera dragging for panning
+            }
+            else
+            {
+                panningMode = false;
+                // Normal picking logic
+                int fbWidth, fbHeight;
+                glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
             int winWidth, winHeight;
             glfwGetWindowSize(window, &winWidth, &winHeight);
             float scaleX = (float)fbWidth / winWidth;
@@ -485,6 +524,7 @@ void InputManager::processMousePickingAndCameraDrag(GLFWwindow* window, std::vec
                 selectedShapes.clear();
                 cameraDragging = true;
             }
+            }
         }
         else if (cameraDragging)
         {
@@ -492,15 +532,60 @@ void InputManager::processMousePickingAndCameraDrag(GLFWwindow* window, std::vec
             double deltaY = mouseY - lastMouseY;
             lastMouseX = mouseX;
             lastMouseY = mouseY;
-            camTheta -= static_cast<float>(deltaX) * 0.008f;
-            camPhi   += static_cast<float>(deltaY) * 0.008f;
-            if(camPhi > 1.57f) camPhi = 1.57f;
-            if(camPhi < -1.57f) camPhi = -1.57f;
+            
+            if (panningMode)
+            {
+                // Pan the camera target instead of rotating
+                float sensitivity = 0.01f;
+                
+                // Calculate camera's right and up vectors
+                float forward[3] = { cameraTarget[0] - cameraPos[0],
+                                     cameraTarget[1] - cameraPos[1],
+                                     cameraTarget[2] - cameraPos[2] };
+                float fLen = std::sqrt(forward[0]*forward[0] + forward[1]*forward[1] + forward[2]*forward[2]);
+                forward[0] /= fLen; forward[1] /= fLen; forward[2] /= fLen;
+                
+                float upDefault[3] = { 0.0f, 1.0f, 0.0f };
+                float right[3] = {
+                    forward[1]*upDefault[2] - forward[2]*upDefault[1],
+                    forward[2]*upDefault[0] - forward[0]*upDefault[2],
+                    forward[0]*upDefault[1] - forward[1]*upDefault[0]
+                };
+                float rLen = std::sqrt(right[0]*right[0] + right[1]*right[1] + right[2]*right[2]);
+                right[0] /= rLen; right[1] /= rLen; right[2] /= rLen;
+                
+                float up[3] = {
+                    right[1]*forward[2] - right[2]*forward[1],
+                    right[2]*forward[0] - right[0]*forward[2],
+                    right[0]*forward[1] - right[1]*forward[0]
+                };
+                
+                // Pan both camera position and target
+                float panX = static_cast<float>(-deltaX) * sensitivity;
+                float panY = static_cast<float>(deltaY) * sensitivity;
+                
+                cameraTarget[0] += panX * right[0] + panY * up[0];
+                cameraTarget[1] += panX * right[1] + panY * up[1];
+                cameraTarget[2] += panX * right[2] + panY * up[2];
+                
+                cameraPos[0] += panX * right[0] + panY * up[0];
+                cameraPos[1] += panX * right[1] + panY * up[1];
+                cameraPos[2] += panX * right[2] + panY * up[2];
+            }
+            else
+            {
+                // Normal rotation
+                camTheta -= static_cast<float>(deltaX) * 0.008f;
+                camPhi   += static_cast<float>(deltaY) * 0.008f;
+                if(camPhi > 1.57f) camPhi = 1.57f;
+                if(camPhi < -1.57f) camPhi = -1.57f;
+            }
         }
     }
     else
     {
         mouseWasPressed = false;
         cameraDragging = false;
+        panningMode = false;
     }
 }
