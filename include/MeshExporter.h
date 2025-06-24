@@ -4,6 +4,10 @@
 #include "Shapes.h"
 #include <vector>
 #include <string>
+#include <functional>
+
+// Callback function type for logging
+using LogCallback = std::function<void(const std::string&, int)>;
 
 struct Vertex {
     float x, y, z;
@@ -22,6 +26,9 @@ struct Mesh {
 
 class MeshExporter {
 public:
+    // Set logging callback
+    static void setLogCallback(LogCallback callback);
+    
     // Export shapes to OBJ format using marching cubes
     static bool exportToOBJ(const std::vector<Shape>& shapes, 
                            const std::string& filename,
@@ -29,6 +36,12 @@ public:
                            float boundingBoxSize = 10.0f);
 
 private:
+    // Logging callback
+    static LogCallback logCallback;
+    
+    // Log helper function
+    static void log(const std::string& message, int level = 0);
+    
     // Marching cubes implementation
     static Mesh generateMeshFromSDF(const std::vector<Shape>& shapes,
                                   int resolution,

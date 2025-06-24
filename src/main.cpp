@@ -136,6 +136,7 @@ int main()
     static char renameBuffer[128] = "";
     bool showGUI = true;
     bool showHelpPopup = false;
+    bool showConsole = false;
     ImVec2 helpButtonPos;
 
     InputManager inputManager;
@@ -161,7 +162,7 @@ int main()
             guiManager.renderGUI(window, shapes, selectedShapes, lightDir, lightColor, ambientColor,
                                  useGradientBackground,
                                  showGUI, altRenderMode, editingShapeIndex, renameBuffer,
-                                 showHelpPopup, helpButtonPos);
+                                 showHelpPopup, helpButtonPos, showConsole);
         }
 
         int display_w, display_h;

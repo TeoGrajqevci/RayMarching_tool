@@ -42,6 +42,26 @@ const int MeshExporter::edgeTable[256] = {
     0x70c, 0x605, 0x50f, 0x406, 0x30a, 0x203, 0x109, 0x0
 };
 
+// Static member definition
+LogCallback MeshExporter::logCallback = nullptr;
+
+void MeshExporter::setLogCallback(LogCallback callback) {
+    logCallback = callback;
+}
+
+void MeshExporter::log(const std::string& message, int level) {
+    if (logCallback) {
+        logCallback(message, level);
+    } else {
+        // Fallback to console output
+        if (level == 2) {
+            std::cerr << message << std::endl;
+        } else {
+            std::cout << message << std::endl;
+        }
+    }
+}
+
 // Triangle table is defined in MarchingCubesTables.cpp
 
 bool MeshExporter::exportToOBJ(const std::vector<Shape>& shapes, 
@@ -54,20 +74,20 @@ bool MeshExporter::exportToOBJ(const std::vector<Shape>& shapes,
     }
     
     if (resolution < 8 || resolution > 1024) {
-        std::cerr << "❌ Invalid resolution: " << resolution << " (must be between 8 and 1024)" << std::endl;
+        log("❌ Invalid resolution: " + std::to_string(resolution) + " (must be between 8 and 1024)", 2);
         return false;
     }
     
     if (filename.empty()) {
-        std::cerr << "❌ Empty filename provided!" << std::endl;
+        log("❌ Empty filename provided!", 2);
         return false;
     }
     
-    std::cout << "🔄 Generating mesh using Marching Cubes..." << std::endl;
-    std::cout << "📊 Resolution: " << resolution << "x" << resolution << "x" << resolution 
-              << " (" << (resolution * resolution * resolution) << " voxels)" << std::endl;
-    std::cout << "📦 Bounding box size: " << boundingBoxSize << std::endl;
-    std::cout << "🎯 Number of shapes: " << shapes.size() << std::endl;
+    log("🔄 Generating mesh using Marching Cubes...", 0);
+    log("📊 Resolution: " + std::to_string(resolution) + "x" + std::to_string(resolution) + "x" + std::to_string(resolution) 
+        + " (" + std::to_string(resolution * resolution * resolution) + " voxels)", 0);
+    log("📦 Bounding box size: " + std::to_string(boundingBoxSize), 0);
+    log("🎯 Number of shapes: " + std::to_string(shapes.size()), 0);
     
     auto startTime = std::chrono::high_resolution_clock::now();
     
@@ -77,13 +97,13 @@ bool MeshExporter::exportToOBJ(const std::vector<Shape>& shapes,
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
     
     if (mesh.vertices.empty() || mesh.triangles.empty()) {
-        std::cerr << "❌ Generated mesh is empty! Try adjusting resolution or bounding box size." << std::endl;
+        log("❌ Generated mesh is empty! Try adjusting resolution or bounding box size.", 2);
         return false;
     }
     
-    std::cout << "✅ Generated mesh with " << mesh.vertices.size() << " vertices and " 
-              << mesh.triangles.size() << " triangles" << std::endl;
-    std::cout << "⏱️  Generation time: " << duration.count() << " ms" << std::endl;
+    log("✅ Generated mesh with " + std::to_string(mesh.vertices.size()) + " vertices and " 
+        + std::to_string(mesh.triangles.size()) + " triangles", 0);
+    log("⏱️  Generation time: " + std::to_string(duration.count()) + " ms", 0);
     
     return writeOBJFile(mesh, filename);
 }
@@ -284,12 +304,12 @@ Vertex MeshExporter::interpolateVertex(const Vertex& v1, const Vertex& v2, float
 }
 
 bool MeshExporter::writeOBJFile(const Mesh& mesh, const std::string& filename) {
-    std::cout << "💾 Writing OBJ file: " << filename << std::endl;
+    log("💾 Writing OBJ file: " + filename, 0);
     
     std::ofstream file(filename);
     if (!file.is_open()) {
-        std::cerr << "❌ Could not open file for writing: " << filename << std::endl;
-        std::cerr << "   Check if the directory exists and you have write permissions." << std::endl;
+        log("❌ Could not open file for writing: " + filename, 2);
+        log("   Check if the directory exists and you have write permissions.", 2);
         return false;
     }
     
@@ -319,14 +339,14 @@ bool MeshExporter::writeOBJFile(const Mesh& mesh, const std::string& filename) {
     // Verify file was written successfully
     std::ifstream checkFile(filename);
     if (!checkFile.is_open()) {
-        std::cerr << "❌ Failed to verify exported file!" << std::endl;
+        log("❌ Failed to verify exported file!", 2);
         return false;
     }
     checkFile.close();
     
-    std::cout << "✅ Successfully exported to: " << filename << std::endl;
-    std::cout << "📊 File contains " << mesh.vertices.size() << " vertices and " 
-              << mesh.triangles.size() << " triangles" << std::endl;
+    log("✅ Successfully exported to: " + filename, 0);
+    log("📊 File contains " + std::to_string(mesh.vertices.size()) + " vertices and " 
+        + std::to_string(mesh.triangles.size()) + " triangles", 0);
     
     return true;
 }

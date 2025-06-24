@@ -17,7 +17,8 @@ void GUIManager::renderGUI(GLFWwindow* window, std::vector<Shape>& shapes, std::
                            bool& useGradientBackground,
                            bool& showGUI, bool& altRenderMode,
                            int& editingShapeIndex, char (&renameBuffer)[128],
-                           bool& showHelpPopup, ImVec2& helpButtonPos)
+                           bool& showHelpPopup, ImVec2& helpButtonPos,
+                           bool& showConsole)
 {
     static bool addShapePopupTriggered = false;
     static ImVec2 addShapePopupPos;
@@ -392,6 +393,11 @@ void GUIManager::renderGUI(GLFWwindow* window, std::vector<Shape>& shapes, std::
         }
     }
     
+    // Console toggle button
+    if (ImGui::Button("Show Console", ImVec2(100, 25))) {
+        showConsole = !showConsole;
+    }
+    
     // Export dialog
     if (showExportDialog) {
         ImGui::SetNextWindowPos(ImVec2(winWidth/2 - 250, winHeight/2 - 200), ImGuiCond_Always);
@@ -511,16 +517,25 @@ void GUIManager::renderGUI(GLFWwindow* window, std::vector<Shape>& shapes, std::
                 finalFilename += ".obj";
             }
             
-            std::cout << "Starting export..." << std::endl;
-            std::cout << "File: " << finalFilename << std::endl;
-            std::cout << "Resolution: " << exportResolution << "x" << exportResolution << "x" << exportResolution << std::endl;
-            std::cout << "Bounding box: " << exportBoundingBox << std::endl;
+            Console::getInstance().addLog("Starting export...", 0);
+            Console::getInstance().addLog("File: " + finalFilename, 0);
+            Console::getInstance().addLog("Resolution: " + std::to_string(exportResolution) + "x" + 
+                                        std::to_string(exportResolution) + "x" + std::to_string(exportResolution), 0);
+            Console::getInstance().addLog("Bounding box: " + std::to_string(exportBoundingBox), 0);
+            
+            // Show console automatically when starting export
+            showConsole = true;
+            
+            // Set up logging callback
+            MeshExporter::setLogCallback([](const std::string& message, int level) {
+                Console::getInstance().addLog(message, level);
+            });
             
             bool success = MeshExporter::exportToOBJ(shapes, finalFilename, exportResolution, exportBoundingBox);
             if (success) {
-                std::cout << "✅ Mesh exported successfully to: " << finalFilename << std::endl;
+                Console::getInstance().addLog("✅ Mesh exported successfully to: " + finalFilename, 0);
             } else {
-                std::cerr << "❌ Failed to export mesh!" << std::endl;
+                Console::getInstance().addLog("❌ Failed to export mesh!", 2);
             }
             showExportDialog = false;
         }
@@ -586,4 +601,118 @@ void GUIManager::renderGUI(GLFWwindow* window, std::vector<Shape>& shapes, std::
             ImGui::End();
         }
     }
+    
+    // Render console panel
+    if (showConsole) {
+        Console::getInstance().render(&showConsole);
+    }
+}
+
+// Console implementation
+Console::Console() {
+    startTime = ImGui::GetTime();
+}
+
+void Console::addLog(const std::string& message, int level) {
+    LogEntry entry;
+    entry.message = message;
+    entry.timestamp = ImGui::GetTime() - startTime;
+    entry.level = level;
+    logs.push_back(entry);
+    
+    // Keep a reasonable number of logs
+    if (logs.size() > 1000) {
+        logs.erase(logs.begin(), logs.begin() + 100);
+    }
+}
+
+void Console::clear() {
+    logs.clear();
+    startTime = ImGui::GetTime();
+}
+
+ImVec4 Console::getLogColor(int level) {
+    switch (level) {
+        case 0: return ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // White for info
+        case 1: return ImVec4(1.0f, 1.0f, 0.0f, 1.0f); // Yellow for warning
+        case 2: return ImVec4(1.0f, 0.4f, 0.4f, 1.0f); // Red for error
+        default: return ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+    }
+}
+
+void Console::render(bool* p_open) {
+    if (!ImGui::Begin("Export Console", p_open, ImGuiWindowFlags_MenuBar)) {
+        ImGui::End();
+        return;
+    }
+    
+    // Options menu
+    if (ImGui::BeginMenuBar()) {
+        if (ImGui::Button("Clear")) {
+            clear();
+        }
+        ImGui::Separator();
+        ImGui::Checkbox("Auto-scroll", &autoScroll);
+        ImGui::Separator();
+        
+        // Log level filters
+        static bool showInfo = true, showWarning = true, showError = true;
+        ImGui::Text("Show:");
+        ImGui::SameLine();
+        if (ImGui::Checkbox("Info", &showInfo)) {}
+        ImGui::SameLine();
+        if (ImGui::Checkbox("Warnings", &showWarning)) {}
+        ImGui::SameLine();
+        if (ImGui::Checkbox("Errors", &showError)) {}
+        
+        ImGui::EndMenuBar();
+    }
+    
+    // Reserve enough left-over height for 1 separator + 1 input text
+    const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
+    if (ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), false, ImGuiWindowFlags_HorizontalScrollbar)) {
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1)); // Tighten spacing
+        
+        static bool showInfo = true, showWarning = true, showError = true;
+        
+        for (const auto& entry : logs) {
+            // Filter by log level
+            if ((entry.level == 0 && !showInfo) || 
+                (entry.level == 1 && !showWarning) || 
+                (entry.level == 2 && !showError)) {
+                continue;
+            }
+            
+            ImVec4 color = getLogColor(entry.level);
+            ImGui::PushStyleColor(ImGuiCol_Text, color);
+            
+            // Format: [timestamp] level_icon message
+            const char* icon = entry.level == 0 ? "ℹ️" : (entry.level == 1 ? "⚠️" : "❌");
+            ImGui::Text("[%.2fs] %s %s", entry.timestamp, icon, entry.message.c_str());
+            
+            ImGui::PopStyleColor();
+        }
+        
+        if (autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
+            ImGui::SetScrollHereY(1.0f);
+        }
+        
+        ImGui::PopStyleVar();
+    }
+    ImGui::EndChild();
+    
+    ImGui::Separator();
+    
+    // Status line
+    int infoCount = 0, warningCount = 0, errorCount = 0;
+    for (const auto& entry : logs) {
+        if (entry.level == 0) infoCount++;
+        else if (entry.level == 1) warningCount++;
+        else if (entry.level == 2) errorCount++;
+    }
+    
+    ImGui::Text("Total: %d | Info: %d | Warnings: %d | Errors: %d", 
+                (int)logs.size(), infoCount, warningCount, errorCount);
+    
+    ImGui::End();
 }
