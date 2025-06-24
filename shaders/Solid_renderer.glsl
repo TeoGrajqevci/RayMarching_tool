@@ -104,15 +104,15 @@ vec3 rotateZ(vec3 p, float angle) {
     return vec3(c * p.x - s * p.y, s * p.x + c * p.y, p.z);
 }
 
-// World-space rotation: apply rotations in reverse order (Z, Y, X) 
-// This ensures that new rotations are always applied in world space first
+// World-space rotation: apply rotations in world-space order (X, Y, Z)
+// This ensures that rotations are applied around world axes
 vec3 rotateWorld(vec3 p, vec3 angles) {
     vec3 result = p;
-    // Apply rotations in reverse order: Z, then Y, then X
-    // This way, the most recent rotation is applied in world space
-    if (angles.z != 0.0) result = rotateZ(result, angles.z);
-    if (angles.y != 0.0) result = rotateY(result, angles.y);
+    // Apply rotations in world-space order: X, then Y, then Z
+    // Each rotation is applied around the original world axes
     if (angles.x != 0.0) result = rotateX(result, angles.x);
+    if (angles.y != 0.0) result = rotateY(result, angles.y);
+    if (angles.z != 0.0) result = rotateZ(result, angles.z);
     return result;
 }
 
@@ -132,23 +132,23 @@ float sdEllipsoid(vec3 p, vec3 center, vec3 radii) {
     return (length(scaledP) - 1.0) * min(min(radii.x, radii.y), radii.z);
 }
 
-// Ellipsoid with rotation
+// Ellipsoid with rotation (now using world-space rotation)
 float sdEllipsoidRotated(vec3 p, vec3 center, vec3 radii, vec3 rotation) {
     vec3 localP = p - center;
-    localP = rotate(localP, -rotation); // Appliquer d'abord la rotation
+    localP = rotateWorld(localP, rotation); // Use positive rotation for world-space
     vec3 scaledP = localP / radii; // Puis la mise à l'échelle dans l'espace local
     return (length(scaledP) - 1.0) * min(min(radii.x, radii.y), radii.z);
 }
 float sdBoxRotated(vec3 p, vec3 halfExtents, vec3 rotation) {
-    vec3 localP = rotate(p, -rotation);
+    vec3 localP = rotateWorld(p, rotation); // Use positive rotation for world-space
     vec3 d = abs(localP) - halfExtents;
     return length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
 }
 
-// Box with non-uniform scaling
+// Box with non-uniform scaling (now using world-space rotation)
 float sdBoxScaled(vec3 p, vec3 center, vec3 halfExtents, vec3 scale, vec3 rotation) {
     vec3 localP = p - center;
-    localP = rotate(localP, -rotation); // Appliquer d'abord la rotation
+    localP = rotateWorld(localP, rotation); // Use positive rotation for world-space
     localP = localP / scale; // Puis la mise à l'échelle dans l'espace local
     vec3 d = abs(localP) - halfExtents;
     float boxDist = length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
@@ -159,14 +159,14 @@ float sdRoundBox(vec3 p, vec3 b, float r) {
     return length(max(q, 0.0)) - r + min(max(q.x, max(q.y, q.z)), 0.0);
 }
 float sdRoundBoxRotated(vec3 p, vec3 b, float r, vec3 rotation) {
-    vec3 localP = rotate(p, -rotation);
+    vec3 localP = rotateWorld(p, rotation); // Use positive rotation for world-space
     return sdRoundBox(localP, b, r);
 }
 
-// Round box with non-uniform scaling
+// Round box with non-uniform scaling (now using world-space rotation)
 float sdRoundBoxScaled(vec3 p, vec3 center, vec3 halfExtents, float r, vec3 scale, vec3 rotation) {
     vec3 localP = p - center;
-    localP = rotate(localP, -rotation); // Appliquer d'abord la rotation
+    localP = rotateWorld(localP, rotation); // Use positive rotation for world-space
     localP = localP / scale; // Puis la mise à l'échelle dans l'espace local
     float roundBoxDist = sdRoundBox(localP, halfExtents, r / min(min(scale.x, scale.y), scale.z));
     return roundBoxDist * min(min(scale.x, scale.y), scale.z);
@@ -176,14 +176,14 @@ float sdTorus(vec3 p, vec2 t) {
     return length(q) - t.y;
 }
 float sdTorusRotated(vec3 p, vec2 t, vec3 rotation) {
-    vec3 localP = rotate(p, -rotation);
+    vec3 localP = rotateWorld(p, rotation); // Use positive rotation for world-space
     return sdTorus(localP, t);
 }
 
-// Torus with non-uniform scaling (creates elliptical torus)
+// Torus with non-uniform scaling (creates elliptical torus, now using world-space rotation)
 float sdTorusScaled(vec3 p, vec3 center, vec2 t, vec3 scale, vec3 rotation) {
     vec3 localP = p - center;
-    localP = rotate(localP, -rotation); // Appliquer d'abord la rotation
+    localP = rotateWorld(localP, rotation); // Use positive rotation for world-space
     localP = localP / scale; // Puis la mise à l'échelle dans l'espace local
     // For torus, we need to adjust the radii based on XZ scaling for the major radius
     // and Y scaling affects the tube radius
@@ -196,14 +196,14 @@ float sdCylinder(vec3 p, float r, float h) {
     return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
 }
 float sdCylinderRotated(vec3 p, float r, float h, vec3 rotation) {
-    vec3 localP = rotate(p, -rotation);
+    vec3 localP = rotateWorld(p, rotation); // Use positive rotation for world-space
     return sdCylinder(localP, r, h);
 }
 
-// Cylinder with non-uniform scaling (creates elliptical cylinder)
+// Cylinder with non-uniform scaling (creates elliptical cylinder, now using world-space rotation)
 float sdCylinderScaled(vec3 p, vec3 center, float r, float h, vec3 scale, vec3 rotation) {
     vec3 localP = p - center;
-    localP = rotate(localP, -rotation); // Appliquer d'abord la rotation
+    localP = rotateWorld(localP, rotation); // Use positive rotation for world-space
     localP = localP / scale; // Puis la mise à l'échelle dans l'espace local
     // For cylinder, XZ scaling affects the radius, Y scaling affects the height
     float adjustedR = r / min(scale.x, scale.z);

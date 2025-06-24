@@ -181,6 +181,8 @@ void InputManager::processTransformationModeActivation(GLFWwindow* window, std::
             ts.rotationConstrained = false;
             ts.rotationAxis = -1;
             ts.rotationKeyHandled = true;
+            ts.showAxisGuides = true; // Activer les guides d'axe pour la rotation
+            ts.activeAxis = -1; // Pas d'axe spécifique encore
             glfwGetCursorPos(window, &ts.rotationStartMouseX, &ts.rotationStartMouseY);
             
             // Calculer le centre de rotation (centre des formes sélectionnées)
@@ -194,6 +196,11 @@ void InputManager::processTransformationModeActivation(GLFWwindow* window, std::
                 ts.rotationCenter[0] = centerX / selectedShapes.size();
                 ts.rotationCenter[1] = centerY / selectedShapes.size();
                 ts.rotationCenter[2] = centerZ / selectedShapes.size();
+                
+                // Utiliser le centre de rotation comme centre des guides
+                ts.guideCenter[0] = ts.rotationCenter[0];
+                ts.guideCenter[1] = ts.rotationCenter[1];
+                ts.guideCenter[2] = ts.rotationCenter[2];
             }
             
             // Sauvegarder les rotations et centres originaux
@@ -212,6 +219,22 @@ void InputManager::processTransformationModeActivation(GLFWwindow* window, std::
             ts.scaleConstrained = false;
             ts.scaleAxis = -1;
             ts.scaleKeyHandled = true;
+            ts.showAxisGuides = true; // Activer les guides d'axe pour la mise à l'échelle
+            ts.activeAxis = -1; // Pas d'axe spécifique encore
+            
+            // Calculer le centre des formes sélectionnées pour les guides
+            if (!selectedShapes.empty()) {
+                float centerX = 0.0f, centerY = 0.0f, centerZ = 0.0f;
+                for (int idx : selectedShapes) {
+                    centerX += shapes[idx].center[0];
+                    centerY += shapes[idx].center[1];
+                    centerZ += shapes[idx].center[2];
+                }
+                ts.guideCenter[0] = centerX / selectedShapes.size();
+                ts.guideCenter[1] = centerY / selectedShapes.size();
+                ts.guideCenter[2] = centerZ / selectedShapes.size();
+            }
+            
             glfwGetCursorPos(window, &ts.scaleStartMouseX, &ts.scaleStartMouseY);
             ts.scaleOriginalParams.clear();
             for (int idx : selectedShapes) {
@@ -430,6 +453,7 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
             {
                 ts.rotationConstrained = true;
                 ts.rotationAxis = 0;
+                ts.activeAxis = 0; // Axe X actif pour les guides
                 glfwGetCursorPos(window, &ts.rotationStartMouseX, &ts.rotationStartMouseY);
                 // Sauvegarder toutes les rotations, pas seulement l'axe concerné
                 for (size_t i = 0; i < selectedShapes.size(); i++) {
@@ -443,6 +467,7 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
             {
                 ts.rotationConstrained = true;
                 ts.rotationAxis = 1;
+                ts.activeAxis = 1; // Axe Y actif pour les guides
                 glfwGetCursorPos(window, &ts.rotationStartMouseX, &ts.rotationStartMouseY);
                 // Sauvegarder toutes les rotations, pas seulement l'axe concerné
                 for (size_t i = 0; i < selectedShapes.size(); i++) {
@@ -456,6 +481,7 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
             {
                 ts.rotationConstrained = true;
                 ts.rotationAxis = 2;
+                ts.activeAxis = 2; // Axe Z actif pour les guides
                 glfwGetCursorPos(window, &ts.rotationStartMouseX, &ts.rotationStartMouseY);
                 // Sauvegarder toutes les rotations, pas seulement l'axe concerné
                 for (size_t i = 0; i < selectedShapes.size(); i++) {
@@ -470,6 +496,8 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
         {
             ts.rotationModeActive = false;
             ts.rotationConstrained = false;
+            ts.showAxisGuides = false; // Désactiver les guides
+            ts.activeAxis = -1;
         }
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         {
@@ -481,6 +509,8 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
             }
             ts.rotationModeActive = false;
             ts.rotationConstrained = false;
+            ts.showAxisGuides = false; // Désactiver les guides
+            ts.activeAxis = -1;
         }
     }
     // Scale mode update
@@ -526,6 +556,7 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
             {
                 ts.scaleConstrained = true;
                 ts.scaleAxis = 0;
+                ts.activeAxis = 0; // Axe X actif pour les guides
                 glfwGetCursorPos(window, &ts.scaleStartMouseX, &ts.scaleStartMouseY);
                 for (size_t i = 0; i < selectedShapes.size(); i++) {
                     int idx = selectedShapes[i];
@@ -538,6 +569,7 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
             {
                 ts.scaleConstrained = true;
                 ts.scaleAxis = 1;
+                ts.activeAxis = 1; // Axe Y actif pour les guides
                 glfwGetCursorPos(window, &ts.scaleStartMouseX, &ts.scaleStartMouseY);
                 for (size_t i = 0; i < selectedShapes.size(); i++) {
                     int idx = selectedShapes[i];
@@ -550,6 +582,7 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
             {
                 ts.scaleConstrained = true;
                 ts.scaleAxis = 2;
+                ts.activeAxis = 2; // Axe Z actif pour les guides
                 glfwGetCursorPos(window, &ts.scaleStartMouseX, &ts.scaleStartMouseY);
                 for (size_t i = 0; i < selectedShapes.size(); i++) {
                     int idx = selectedShapes[i];
@@ -563,6 +596,8 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
         {
             ts.scaleModeActive = false;
             ts.scaleConstrained = false;
+            ts.showAxisGuides = false; // Désactiver les guides
+            ts.activeAxis = -1;
         }
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         {
@@ -574,6 +609,8 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
             }
             ts.scaleModeActive = false;
             ts.scaleConstrained = false;
+            ts.showAxisGuides = false; // Désactiver les guides
+            ts.activeAxis = -1;
         }
     }
 }
