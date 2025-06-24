@@ -259,7 +259,7 @@ void GUIManager::renderGUI(GLFWwindow* window, std::vector<Shape>& shapes, std::
 
     if (!selectedShapes.empty())
     {
-        ImGui::SetNextWindowPos(ImVec2(0, 190), ImGuiCond_Always);
+        ImGui::SetNextWindowPos(ImVec2(0, 110), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(290, 150), ImGuiCond_Always);
         ImGui::Begin("Shape Parameters", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
         int selIdx = selectedShapes[0];
@@ -359,7 +359,7 @@ void GUIManager::renderGUI(GLFWwindow* window, std::vector<Shape>& shapes, std::
     }
 
     ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(366, 190), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(366, 110), ImGuiCond_Always);
     ImGui::Begin("Lighting Parameters", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
     if (ImGui::BeginTabBar("LightingParametersTabs", ImGuiTabBarFlags_None))
     {
@@ -376,7 +376,7 @@ void GUIManager::renderGUI(GLFWwindow* window, std::vector<Shape>& shapes, std::
 
     ImGui::SetNextWindowPos(ImVec2(380, 0), ImGuiCond_Always);
     ImGui::SetNextWindowBgAlpha(0.0f);
-    ImGui::SetNextWindowSize(ImVec2(200, 72), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(200, 172), ImGuiCond_Always);
     ImGui::Begin("Overlays", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar);
     ImGui::Checkbox("hide Overlays", &altRenderMode);
     

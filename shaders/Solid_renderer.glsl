@@ -150,7 +150,8 @@ float sdBoxScaled(vec3 p, vec3 center, vec3 halfExtents, vec3 scale, vec3 rotati
     vec3 localP = p - center;
     localP = rotateWorld(localP, rotation); // Use positive rotation for world-space
     localP = localP / scale; // Puis la mise à l'échelle dans l'espace local
-    vec3 d = abs(localP) - halfExtents;
+    vec3 scaledExtents = halfExtents / scale;
+    vec3 d = abs(localP) - scaledExtents;
     float boxDist = length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
     return boxDist * min(min(scale.x, scale.y), scale.z);
 }
@@ -168,7 +169,9 @@ float sdRoundBoxScaled(vec3 p, vec3 center, vec3 halfExtents, float r, vec3 scal
     vec3 localP = p - center;
     localP = rotateWorld(localP, rotation); // Use positive rotation for world-space
     localP = localP / scale; // Puis la mise à l'échelle dans l'espace local
-    float roundBoxDist = sdRoundBox(localP, halfExtents, r / min(min(scale.x, scale.y), scale.z));
+    vec3 scaledExtents = halfExtents / scale;
+    float scaledRadius = r / min(min(scale.x, scale.y), scale.z);
+    float roundBoxDist = sdRoundBox(localP, scaledExtents, scaledRadius);
     return roundBoxDist * min(min(scale.x, scale.y), scale.z);
 }
 float sdTorus(vec3 p, vec2 t) {
@@ -187,8 +190,8 @@ float sdTorusScaled(vec3 p, vec3 center, vec2 t, vec3 scale, vec3 rotation) {
     localP = localP / scale; // Puis la mise à l'échelle dans l'espace local
     // For torus, we need to adjust the radii based on XZ scaling for the major radius
     // and Y scaling affects the tube radius
-    vec2 adjustedT = vec2(t.x / min(scale.x, scale.z), t.y / scale.y);
-    float torusDist = sdTorus(localP, adjustedT);
+    vec2 scaledT = vec2(t.x / min(scale.x, scale.z), t.y / scale.y);
+    float torusDist = sdTorus(localP, scaledT);
     return torusDist * min(min(scale.x, scale.y), scale.z);
 }
 float sdCylinder(vec3 p, float r, float h) {
@@ -206,9 +209,9 @@ float sdCylinderScaled(vec3 p, vec3 center, float r, float h, vec3 scale, vec3 r
     localP = rotateWorld(localP, rotation); // Use positive rotation for world-space
     localP = localP / scale; // Puis la mise à l'échelle dans l'espace local
     // For cylinder, XZ scaling affects the radius, Y scaling affects the height
-    float adjustedR = r / min(scale.x, scale.z);
-    float adjustedH = h / scale.y;
-    float cylinderDist = sdCylinder(localP, adjustedR, adjustedH);
+    float scaledR = r / min(scale.x, scale.z);
+    float scaledH = h / scale.y;
+    float cylinderDist = sdCylinder(localP, scaledR, scaledH);
     return cylinderDist * min(min(scale.x, scale.y), scale.z);
 }
 // ----- Acceleration Helper: Bounding Radius per Shape -----
