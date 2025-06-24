@@ -380,16 +380,165 @@ void GUIManager::renderGUI(GLFWwindow* window, std::vector<Shape>& shapes, std::
     ImGui::Checkbox("hide Overlays", &altRenderMode);
     
     // Export button
+    static bool showExportDialog = false;
+    static char exportFilename[512] = "exported_mesh.obj";
+    static int exportResolution = 64;
+    static float exportBoundingBox = 10.0f;
+    static bool autoOpenFolder = false;
+    
     if (ImGui::Button("Export to OBJ", ImVec2(120, 25))) {
         if (!shapes.empty()) {
-            std::string filename = "exported_mesh.obj";
-            bool success = MeshExporter::exportToOBJ(shapes, filename, 64, 10.0f);
-            if (success) {
-                std::cout << "Mesh exported successfully to " << filename << std::endl;
-            } else {
-                std::cerr << "Failed to export mesh!" << std::endl;
-            }
+            showExportDialog = true;
         }
+    }
+    
+    // Export dialog
+    if (showExportDialog) {
+        ImGui::SetNextWindowPos(ImVec2(winWidth/2 - 250, winHeight/2 - 200), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(500, 400), ImGuiCond_Always);
+        ImGui::Begin("Export Settings", &showExportDialog, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+        
+        ImGui::Text("Export Mesh to OBJ Format");
+        ImGui::Separator();
+        
+        // File path section
+        ImGui::Text("File Path:");
+        ImGui::InputText("##filepath", exportFilename, sizeof(exportFilename));
+        ImGui::SameLine();
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Specify full path or just filename\nExample: /Users/yourname/Desktop/mesh.obj\nor just: my_mesh.obj");
+        }
+        
+        // Quick path buttons
+        ImGui::Text("Quick paths:");
+        if (ImGui::Button("Desktop", ImVec2(70, 20))) {
+            strcpy(exportFilename, "~/Desktop/exported_mesh.obj");
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Documents", ImVec2(80, 20))) {
+            strcpy(exportFilename, "~/Documents/exported_mesh.obj");
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Current Dir", ImVec2(80, 20))) {
+            strcpy(exportFilename, "exported_mesh.obj");
+        }
+        
+        // Auto-add .obj extension if not present
+        std::string currentFilename = std::string(exportFilename);
+        bool hasObjExtension = currentFilename.length() >= 4 && 
+                              currentFilename.substr(currentFilename.length() - 4) == ".obj";
+        if (!hasObjExtension && !currentFilename.empty()) {
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Note: .obj extension will be added automatically");
+        }
+        
+        ImGui::Spacing();
+        
+        // Resolution settings
+        ImGui::Text("Resolution (higher = more detail, slower):");
+        ImGui::SliderInt("##resolution", &exportResolution, 16, 512);
+        ImGui::Text("Grid size: %dx%dx%d (%d voxels)", exportResolution, exportResolution, exportResolution, 
+                   exportResolution * exportResolution * exportResolution);
+        
+        ImGui::Spacing();
+        
+        // Bounding box settings
+        ImGui::Text("Bounding Box Size:");
+        ImGui::SliderFloat("##boundingbox", &exportBoundingBox, 1.0f, 100.0f, "%.1f");
+        ImGui::TextDisabled("Size of the export volume around your shapes");
+        
+        ImGui::Separator();
+        
+        // Quality presets
+        ImGui::Text("Quality Presets:");
+        ImGui::Columns(2, "presets", false);
+        
+        if (ImGui::Button("Draft (16x16x16)", ImVec2(140, 25))) {
+            exportResolution = 16;
+        }
+        if (ImGui::Button("Low (32x32x32)", ImVec2(140, 25))) {
+            exportResolution = 32;
+        }
+        
+        ImGui::NextColumn();
+        
+        if (ImGui::Button("Medium (64x64x64)", ImVec2(140, 25))) {
+            exportResolution = 64;
+        }
+        if (ImGui::Button("High (128x128x128)", ImVec2(140, 25))) {
+            exportResolution = 128;
+        }
+        
+        ImGui::Columns(1);
+        
+        if (ImGui::Button("Very High (256x256x256)", ImVec2(200, 25))) {
+            exportResolution = 256;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Ultra (512x512x512)", ImVec2(200, 25))) {
+            exportResolution = 512;
+        }
+        
+        ImGui::Separator();
+        
+        // Performance warning
+        float estimatedTime = (exportResolution * exportResolution * exportResolution) / 500000.0f;
+        long long memoryUsage = (long long)exportResolution * exportResolution * exportResolution * 4; // 4 bytes per float
+        
+        if (exportResolution >= 256) {
+            ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.0f, 1.0f), "WARNING: Very high resolution!");
+            ImGui::Text("This may take several minutes and use significant memory.");
+        } else if (exportResolution >= 128) {
+            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.0f, 1.0f), "Warning: High resolution may take time.");
+        }
+        
+        ImGui::Text("Estimated time: %.1f seconds", estimatedTime);
+        ImGui::Text("Memory usage: %.1f MB", memoryUsage / (1024.0f * 1024.0f));
+        
+        ImGui::Separator();
+        
+        // Export/Cancel buttons
+        bool canExport = strlen(exportFilename) > 0;
+        if (!canExport) {
+            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
+        }
+        
+        if (ImGui::Button("Export", ImVec2(120, 35)) && canExport) {
+            std::string finalFilename = std::string(exportFilename);
+            
+            // Add .obj extension if not present
+            if (finalFilename.length() < 4 || finalFilename.substr(finalFilename.length() - 4) != ".obj") {
+                finalFilename += ".obj";
+            }
+            
+            std::cout << "Starting export..." << std::endl;
+            std::cout << "File: " << finalFilename << std::endl;
+            std::cout << "Resolution: " << exportResolution << "x" << exportResolution << "x" << exportResolution << std::endl;
+            std::cout << "Bounding box: " << exportBoundingBox << std::endl;
+            
+            bool success = MeshExporter::exportToOBJ(shapes, finalFilename, exportResolution, exportBoundingBox);
+            if (success) {
+                std::cout << "✅ Mesh exported successfully to: " << finalFilename << std::endl;
+            } else {
+                std::cerr << "❌ Failed to export mesh!" << std::endl;
+            }
+            showExportDialog = false;
+        }
+        
+        if (!canExport) {
+            ImGui::PopStyleVar();
+        }
+        
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 35))) {
+            showExportDialog = false;
+        }
+        
+        if (!canExport) {
+            ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.5f, 1.0f), "Please enter a filename to export");
+        }
+        
+        ImGui::End();
     }
     ImGui::End();
 
