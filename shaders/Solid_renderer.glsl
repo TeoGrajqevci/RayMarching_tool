@@ -302,14 +302,19 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
          vec3 F0 = mix(vec3(0.04), baseColor, metallic);
          vec3 L = normalize(lightDir);
          float NdotL = max(dot(N, L), 0.0);
-         vec3 diffuse = baseColor * (1.0 - metallic) * NdotL;
+         vec3 diffuse = baseColor * (1.0 - metallic) * NdotL * lightColor;
          vec3 H = normalize(L + V);
          float NdotH = max(dot(N, H), 0.0);
          float specular = pow(NdotH, 1.0/(roughness+0.001));
-         vec3 spec = F0 * specular;
-         color = diffuse + spec;
+         vec3 spec = F0 * specular * lightColor;
+         
+         // Calculate shadow for direct lighting only
          float shadow = softShadow(hitPos + N*SURFACE_DIST*2.0, L, 0.001, MAX_DIST, 32.0);
-         color *= shadow;
+         
+         // Apply shadow only to direct lighting, keep ambient lighting always present
+         vec3 directLighting = (diffuse + spec) * shadow;
+         vec3 ambientLighting = ambientColor * baseColor;
+         color = directLighting + ambientLighting;
          if (hdrLoaded && useHdrLighting) {
              vec3 reflectionDir = reflect(-V, N);
              vec3 envSpecular = sampleEnvironmentMap(reflectionDir);
@@ -321,9 +326,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
          }
     } else {
          if (hdrLoaded && useHdrBackground) {
-             color = sampleEnvironmentMap(rd);
+             color = sampleEnvironmentMap(rd) * ambientColor;
          } else {
-             color = (uBackgroundGradient==1) ? vec3(0.1) : vec3(0.0);
+             vec3 baseColor = (uBackgroundGradient==1) ? vec3(0.1) : vec3(0.0);
+             color = baseColor + ambientColor * 0.5;
          }
     }
     
