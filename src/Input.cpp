@@ -507,7 +507,7 @@ void InputManager::processMousePickingAndCameraDrag(GLFWwindow* window, std::vec
             double deltaY = mouseY - lastMouseY;
             lastMouseX = mouseX;
             lastMouseY = mouseY;
-            camTheta += static_cast<float>(deltaX) * 0.008f;
+            camTheta -= static_cast<float>(deltaX) * 0.008f;
             camPhi   += static_cast<float>(deltaY) * 0.008f;
             if(camPhi > 1.57f) camPhi = 1.57f;
             if(camPhi < -1.57f) camPhi = -1.57f;
