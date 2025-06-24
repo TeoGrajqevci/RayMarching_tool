@@ -13,8 +13,7 @@ void GUIManager::newFrame() {
 
 void GUIManager::renderGUI(GLFWwindow* window, std::vector<Shape>& shapes, std::vector<int>& selectedShapes,
                            float lightDir[3], float lightColor[3], float ambientColor[3],
-                           bool& useGradientBackground, char (&hdrFilePath)[512], Texture& hdrTexture, bool& hdrLoaded,
-                           float& hdrIntensity, bool& useHdrBackground, bool& useHdrLighting,
+                           bool& useGradientBackground,
                            bool& showGUI, bool& altRenderMode,
                            int& editingShapeIndex, char (&renameBuffer)[128],
                            bool& showHelpPopup, ImVec2& helpButtonPos)
@@ -362,50 +361,6 @@ void GUIManager::renderGUI(GLFWwindow* window, std::vector<Shape>& shapes, std::
             ImGui::DragFloat3("Light Direction", lightDir, 0.01f);
             ImGui::ColorEdit3("Light Color", lightColor);
             ImGui::ColorEdit3("Ambient Color", ambientColor);
-            ImGui::EndTabItem();
-        }
-        if (ImGui::BeginTabItem("HDR Environment"))
-        {
-            ImGui::Text("HDR Image: %s", hdrLoaded ? hdrFilePath : "None");
-            static char inputPath[512] = "";
-            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
-            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 10));
-            ImGui::InputTextWithHint("##hdrpath", "Drag & drop HDR/EXR file here or enter path...", inputPath, sizeof(inputPath));
-            ImGui::PopStyleVar();
-            ImGui::PopStyleColor();
-            if (ImGui::BeginDragDropTarget()) 
-            {
-                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("EXTERNAL_FILE"))
-                {
-                    const char* dropped_path = (const char*)payload->Data;
-                    std::string filepath(dropped_path);
-                    std::string ext = filepath.substr(filepath.find_last_of(".") + 1);
-                    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                    if (ext == "hdr" || ext == "exr") {
-                        if (hdrTexture.loadHDR(dropped_path)) {
-                            strncpy(hdrFilePath, dropped_path, sizeof(hdrFilePath) - 1);
-                            hdrFilePath[sizeof(hdrFilePath) - 1] = '\0';
-                            strncpy(inputPath, dropped_path, sizeof(inputPath) - 1);
-                            inputPath[sizeof(inputPath) - 1] = '\0';
-                            hdrLoaded = true;
-                        }
-                    }
-                }
-                ImGui::EndDragDropTarget();
-            }
-            if (ImGui::Button("Load HDR/EXR"))
-            {
-                if (strlen(inputPath) > 0) {
-                    if (hdrTexture.loadHDR(inputPath)) {
-                        strcpy(hdrFilePath, inputPath);
-                        hdrLoaded = true;
-                    }
-                }
-            }
-            ImGui::Separator();
-            ImGui::Checkbox("Use as Background", &useHdrBackground);
-            ImGui::Checkbox("Use for Image-Based Lighting", &useHdrLighting);
-            ImGui::DragFloat("Intensity", &hdrIntensity, 0.01f, 0.0f, 10.0f);
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();

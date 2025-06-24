@@ -24,21 +24,6 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
         camDistance = 20.0f;
 }
 
-void drop_callback(GLFWwindow* window, int count, const char** paths)
-{
-    if (count > 0) {
-        const char* path = paths[0];
-        std::string filepath(path);
-        std::string ext = filepath.substr(filepath.find_last_of(".") + 1);
-        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-        
-        if (ext == "hdr" || ext == "exr") {
-            if (hdrTexture.loadHDR(path)) {
-            }
-        }
-    }
-}
-
 InputManager::InputManager()
 {
 }

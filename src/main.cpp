@@ -11,7 +11,6 @@
 #include <cstddef>
 
 #include "Shader.h"
-#include "Texture.h"
 #include "ImGuiLayer.h"
 #include "Shapes.h"
 #include "Input.h"         
@@ -25,8 +24,6 @@
 #include "Renderer.h"
 
 float camDistance = 3.0f;
-Texture hdrTexture;
-bool hdrLoaded = false;
 
 
 void updateCameraPosition(float camDistance, float camTheta, float camPhi, const float cameraTarget[3], float cameraPos[3])
@@ -60,7 +57,6 @@ int main()
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetScrollCallback(window, scroll_callback);
-    glfwSetDropCallback(window, drop_callback);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -103,7 +99,7 @@ int main()
     // --- 5. Lighting parameters ---
     float lightDir[3] = { 0.5f, 0.8f, 1.0f };
     float lightColor[3] = { 1.0f, 1.0f, 1.0f };
-    float ambientColor[3] = { 0.17f, 0.17f, 0.17f };
+    float ambientColor[3] = { 0.0f, 0.0f, 0.0f };
 
     // --- 6. Camera orbit parameters ---
     float camTheta = 0.0f;
@@ -138,10 +134,6 @@ int main()
     static int editingShapeIndex = -1;
     static char renameBuffer[128] = "";
     bool showGUI = true;
-    bool useHdrBackground = true;
-    bool useHdrLighting = true;
-    char hdrFilePath[512] = "";
-    float hdrIntensity = 1.0f;
     bool showHelpPopup = false;
     ImVec2 helpButtonPos;
 
@@ -166,8 +158,7 @@ int main()
         {
             guiManager.newFrame();
             guiManager.renderGUI(window, shapes, selectedShapes, lightDir, lightColor, ambientColor,
-                                 useGradientBackground, hdrFilePath, hdrTexture, hdrLoaded,
-                                 hdrIntensity, useHdrBackground, useHdrLighting,
+                                 useGradientBackground,
                                  showGUI, altRenderMode, editingShapeIndex, renameBuffer,
                                  showHelpPopup, helpButtonPos);
         }
@@ -178,10 +169,10 @@ int main()
         glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        Renderer renderer(shader, VAO, hdrTexture);
+        Renderer renderer(shader, VAO);
         renderer.renderScene(shapes, selectedShapes, lightDir, lightColor, ambientColor,
                              cameraPos, cameraTarget, display_w, display_h,
-                             hdrIntensity, useHdrBackground, useHdrLighting, hdrLoaded, altRenderMode, useGradientBackground);
+                             altRenderMode, useGradientBackground);
 
         if (showGUI)
             ImGuiLayer::Render();

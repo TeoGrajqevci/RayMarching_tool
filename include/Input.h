@@ -56,6 +56,5 @@ public:
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-void drop_callback(GLFWwindow* window, int count, const char** paths);
 
 #endif

@@ -17,12 +17,6 @@ struct SDFResult {
 uniform float shapeMetallic[50];
 uniform float shapeRoughness[50];
 uniform vec3 shapeAlbedos[50];
-// --- HDR Environment Map Uniforms ---
-uniform sampler2D hdrTexture;
-uniform bool useHdrBackground;
-uniform bool useHdrLighting;
-uniform float hdrIntensity;
-uniform bool hdrLoaded;
 // --- Scene shape uniforms ---
 uniform int shapeCount;
 uniform int shapeTypes[50];       // 0: sphere, 1: box, 2: round box, 3: torus, 4: cylinder
@@ -53,14 +47,6 @@ uniform int uBackgroundGradient;
 const int MAX_STEPS = 100;
 const float MAX_DIST = 100.0;
 const float SURFACE_DIST = 0.001;
-// ----- Helper: Sample HDR Environment Map -----
-vec3 sampleEnvironmentMap(vec3 direction) {
-    float phi = atan(direction.z, direction.x);
-    float theta = asin(direction.y);
-    float u = (phi + 3.1415926) / (2.0 * 3.1415926);
-    float v = (theta + 3.1415926/2.0) / 3.1415926;
-    return texture(hdrTexture, vec2(u, v)).rgb * hdrIntensity;
-}
 // ----- Blend Operation Functions for SDFResult -----
 SDFResult opSmoothUnion(SDFResult a, SDFResult b, float k)
 {
@@ -315,22 +301,9 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
          vec3 directLighting = (diffuse + spec) * shadow;
          vec3 ambientLighting = ambientColor * baseColor;
          color = directLighting + ambientLighting;
-         if (hdrLoaded && useHdrLighting) {
-             vec3 reflectionDir = reflect(-V, N);
-             vec3 envSpecular = sampleEnvironmentMap(reflectionDir);
-             vec3 envDiffuse = sampleEnvironmentMap(N);
-             vec3 envColor = mix(envDiffuse * baseColor * (1.0-metallic), 
-                                envSpecular, 
-                                mix(roughness, 1.0-roughness, metallic));
-             color = mix(color, color + envColor, 0.5);
-         }
     } else {
-         if (hdrLoaded && useHdrBackground) {
-             color = sampleEnvironmentMap(rd) * ambientColor;
-         } else {
-             vec3 baseColor = (uBackgroundGradient==1) ? vec3(0.1) : vec3(0.0);
-             color = baseColor + ambientColor * 0.5;
-         }
+         vec3 baseColor = (uBackgroundGradient==1) ? vec3(0.1) : vec3(0.0);
+         color = baseColor + ambientColor ;
     }
     
     if(uRenderMode == 0)

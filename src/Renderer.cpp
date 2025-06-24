@@ -5,8 +5,8 @@
 #include <algorithm>
 #include <GLFW/glfw3.h> // For glfwGetTime()
 
-Renderer::Renderer(Shader& shader, GLuint vao, Texture& hdrTexture)
-    : shader(shader), quadVAO(vao), hdrTexture(hdrTexture)
+Renderer::Renderer(Shader& shader, GLuint vao)
+    : shader(shader), quadVAO(vao)
 {
 }
 
@@ -14,8 +14,7 @@ void Renderer::renderScene(const std::vector<Shape>& shapes, const std::vector<i
                      const float lightDir[3], const float lightColor[3], const float ambientColor[3],
                      const float cameraPos[3], const float cameraTarget[3],
                      int display_w, int display_h,
-                     float hdrIntensity, bool useHdrBackground, bool useHdrLighting,
-                     bool hdrLoaded, bool altRenderMode, bool useGradientBackground)
+                     bool altRenderMode, bool useGradientBackground)
 {
     shader.use();
     shader.setInt("uRenderMode", altRenderMode ? 1 : 0);
@@ -166,17 +165,6 @@ void Renderer::renderScene(const std::vector<Shape>& shapes, const std::vector<i
     glUniform4fv(glGetUniformLocation(shader.ID, "uSelectedParams"), 50, selParams);
     glUniform3fv(glGetUniformLocation(shader.ID, "uSelectedRotations"), 50, selRotations);
     shader.setFloat("uOutlineThickness", 0.015f);
-
-    // HDR uniforms and texture binding
-    shader.setInt("hdrTexture", 0);
-    shader.setInt("useHdrBackground", useHdrBackground ? 1 : 0);
-    shader.setInt("useHdrLighting", useHdrLighting ? 1 : 0);
-    shader.setFloat("hdrIntensity", hdrIntensity);
-    shader.setInt("hdrLoaded", hdrLoaded ? 1 : 0);
-    if (hdrLoaded) {
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, hdrTexture.id);
-    }
 
     glBindVertexArray(quadVAO);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
