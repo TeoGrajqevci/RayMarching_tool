@@ -27,6 +27,8 @@ struct TransformationState {
     int rotationAxis = -1;
     double rotationStartMouseX = 0.0, rotationStartMouseY = 0.0;
     std::vector<std::array<float, 3>> rotationOriginalRotations;
+    std::vector<std::array<float, 3>> rotationOriginalCenters; // Centres originaux pour rotation mondiale
+    float rotationCenter[3] = {0.0f, 0.0f, 0.0f}; // Centre de rotation mondiale
 
     bool scaleConstrained = false;
     int scaleAxis = -1;

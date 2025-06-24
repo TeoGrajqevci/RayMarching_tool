@@ -5,10 +5,48 @@
 #include <cstring>
 #include <algorithm>
 #include "Texture.h"
+#include <cmath>
 
 extern float camDistance;
 extern Texture hdrTexture;
 extern bool hdrLoaded;
+
+// Fonctions utilitaires pour la rotation 3D
+void rotateAroundAxis(float point[3], float center[3], float axis[3], float angle) {
+    // Translate point to origin
+    float translated[3] = {
+        point[0] - center[0],
+        point[1] - center[1],
+        point[2] - center[2]
+    };
+    
+    // Rotation matrix using Rodrigues' formula
+    float cosA = std::cos(angle);
+    float sinA = std::sin(angle);
+    float oneMinusCosA = 1.0f - cosA;
+    
+    // Normalize axis
+    float axisLength = std::sqrt(axis[0]*axis[0] + axis[1]*axis[1] + axis[2]*axis[2]);
+    float normalizedAxis[3] = {axis[0]/axisLength, axis[1]/axisLength, axis[2]/axisLength};
+    
+    float rotated[3];
+    rotated[0] = translated[0] * (cosA + normalizedAxis[0]*normalizedAxis[0]*oneMinusCosA) +
+                 translated[1] * (normalizedAxis[0]*normalizedAxis[1]*oneMinusCosA - normalizedAxis[2]*sinA) +
+                 translated[2] * (normalizedAxis[0]*normalizedAxis[2]*oneMinusCosA + normalizedAxis[1]*sinA);
+    
+    rotated[1] = translated[0] * (normalizedAxis[1]*normalizedAxis[0]*oneMinusCosA + normalizedAxis[2]*sinA) +
+                 translated[1] * (cosA + normalizedAxis[1]*normalizedAxis[1]*oneMinusCosA) +
+                 translated[2] * (normalizedAxis[1]*normalizedAxis[2]*oneMinusCosA - normalizedAxis[0]*sinA);
+    
+    rotated[2] = translated[0] * (normalizedAxis[2]*normalizedAxis[0]*oneMinusCosA - normalizedAxis[1]*sinA) +
+                 translated[1] * (normalizedAxis[2]*normalizedAxis[1]*oneMinusCosA + normalizedAxis[0]*sinA) +
+                 translated[2] * (cosA + normalizedAxis[2]*normalizedAxis[2]*oneMinusCosA);
+    
+    // Translate back
+    point[0] = rotated[0] + center[0];
+    point[1] = rotated[1] + center[1];
+    point[2] = rotated[2] + center[2];
+}
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
@@ -144,10 +182,28 @@ void InputManager::processTransformationModeActivation(GLFWwindow* window, std::
             ts.rotationAxis = -1;
             ts.rotationKeyHandled = true;
             glfwGetCursorPos(window, &ts.rotationStartMouseX, &ts.rotationStartMouseY);
+            
+            // Calculer le centre de rotation (centre des formes sélectionnées)
+            if (!selectedShapes.empty()) {
+                float centerX = 0.0f, centerY = 0.0f, centerZ = 0.0f;
+                for (int idx : selectedShapes) {
+                    centerX += shapes[idx].center[0];
+                    centerY += shapes[idx].center[1];
+                    centerZ += shapes[idx].center[2];
+                }
+                ts.rotationCenter[0] = centerX / selectedShapes.size();
+                ts.rotationCenter[1] = centerY / selectedShapes.size();
+                ts.rotationCenter[2] = centerZ / selectedShapes.size();
+            }
+            
+            // Sauvegarder les rotations et centres originaux
             ts.rotationOriginalRotations.clear();
+            ts.rotationOriginalCenters.clear();
             for (int idx : selectedShapes) {
                 std::array<float, 3> rot = { shapes[idx].rotation[0], shapes[idx].rotation[1], shapes[idx].rotation[2] };
+                std::array<float, 3> center = { shapes[idx].center[0], shapes[idx].center[1], shapes[idx].center[2] };
                 ts.rotationOriginalRotations.push_back(rot);
+                ts.rotationOriginalCenters.push_back(center);
             }
         }
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS && !ts.scaleKeyHandled)
@@ -293,25 +349,79 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
         double deltaX = currentMouseX - ts.rotationStartMouseX;
         double deltaY = currentMouseY - ts.rotationStartMouseY;
         float sensitivity = 0.005f;
+        
         if (ts.rotationConstrained)
         {
+            // Rotation contrainte autour d'un axe spécifique
+            float axis[3] = {0.0f, 0.0f, 0.0f};
+            float angle = static_cast<float>(deltaX) * sensitivity;
+            
+            if (ts.rotationAxis == 0) axis[0] = 1.0f;      // X axis
+            else if (ts.rotationAxis == 1) axis[1] = 1.0f; // Y axis
+            else if (ts.rotationAxis == 2) axis[2] = 1.0f; // Z axis
+            
             for (size_t i = 0; i < selectedShapes.size(); i++) {
                 int idx = selectedShapes[i];
-                if (ts.rotationAxis == 0)
-                    shapes[idx].rotation[0] = ts.rotationOriginalRotations[i][0] + static_cast<float>(deltaX) * sensitivity;
-                else if (ts.rotationAxis == 1)
-                    shapes[idx].rotation[1] = ts.rotationOriginalRotations[i][1] + static_cast<float>(deltaX) * sensitivity;
-                else if (ts.rotationAxis == 2)
-                    shapes[idx].rotation[2] = ts.rotationOriginalRotations[i][2] + static_cast<float>(deltaX) * sensitivity;
+                
+                // Restaurer position originale
+                shapes[idx].center[0] = ts.rotationOriginalCenters[i][0];
+                shapes[idx].center[1] = ts.rotationOriginalCenters[i][1];
+                shapes[idx].center[2] = ts.rotationOriginalCenters[i][2];
+                
+                // Restaurer rotation originale
+                shapes[idx].rotation[0] = ts.rotationOriginalRotations[i][0];
+                shapes[idx].rotation[1] = ts.rotationOriginalRotations[i][1];
+                shapes[idx].rotation[2] = ts.rotationOriginalRotations[i][2];
+                
+                // Appliquer la rotation autour du centre de rotation mondial
+                rotateAroundAxis(shapes[idx].center, ts.rotationCenter, axis, angle);
+                
+                // Pour une rotation d'espace monde, accumuler les rotations
+                // en gardant les autres axes et en ajoutant la nouvelle rotation
+                if (ts.rotationAxis == 0) {
+                    shapes[idx].rotation[0] = ts.rotationOriginalRotations[i][0] + angle;  // Accumuler X
+                    shapes[idx].rotation[1] = ts.rotationOriginalRotations[i][1]; // Garder Y
+                    shapes[idx].rotation[2] = ts.rotationOriginalRotations[i][2]; // Garder Z
+                } else if (ts.rotationAxis == 1) {
+                    shapes[idx].rotation[0] = ts.rotationOriginalRotations[i][0]; // Garder X
+                    shapes[idx].rotation[1] = ts.rotationOriginalRotations[i][1] + angle;  // Accumuler Y
+                    shapes[idx].rotation[2] = ts.rotationOriginalRotations[i][2]; // Garder Z
+                } else if (ts.rotationAxis == 2) {
+                    shapes[idx].rotation[0] = ts.rotationOriginalRotations[i][0]; // Garder X
+                    shapes[idx].rotation[1] = ts.rotationOriginalRotations[i][1]; // Garder Y
+                    shapes[idx].rotation[2] = ts.rotationOriginalRotations[i][2] + angle;  // Accumuler Z
+                }
             }
         }
         else
         {
+            // Rotation libre (combinaison des axes X et Y)
+            float angleX = static_cast<float>(deltaY) * sensitivity;
+            float angleY = static_cast<float>(deltaX) * sensitivity;
+            
             for (size_t i = 0; i < selectedShapes.size(); i++) {
                 int idx = selectedShapes[i];
-                shapes[idx].rotation[0] = ts.rotationOriginalRotations[i][0] + static_cast<float>(deltaY) * sensitivity;
-                shapes[idx].rotation[1] = ts.rotationOriginalRotations[i][1] + static_cast<float>(deltaX) * sensitivity;
+                
+                // Restaurer position originale
+                shapes[idx].center[0] = ts.rotationOriginalCenters[i][0];
+                shapes[idx].center[1] = ts.rotationOriginalCenters[i][1];
+                shapes[idx].center[2] = ts.rotationOriginalCenters[i][2];
+                
+                // Restaurer rotation originale
+                shapes[idx].rotation[0] = ts.rotationOriginalRotations[i][0];
+                shapes[idx].rotation[1] = ts.rotationOriginalRotations[i][1];
                 shapes[idx].rotation[2] = ts.rotationOriginalRotations[i][2];
+                
+                // Appliquer rotation Y puis X
+                float axisY[3] = {0.0f, 1.0f, 0.0f};
+                float axisX[3] = {1.0f, 0.0f, 0.0f};
+                rotateAroundAxis(shapes[idx].center, ts.rotationCenter, axisY, angleY);
+                rotateAroundAxis(shapes[idx].center, ts.rotationCenter, axisX, angleX);
+                
+                // Pour une rotation d'espace monde, accumuler les rotations X et Y
+                shapes[idx].rotation[0] = ts.rotationOriginalRotations[i][0] + angleX;  // Accumuler X
+                shapes[idx].rotation[1] = ts.rotationOriginalRotations[i][1] + angleY;  // Accumuler Y
+                shapes[idx].rotation[2] = ts.rotationOriginalRotations[i][2];     // Garder Z
             }
         }
         if (!ts.rotationConstrained && !ImGui::GetIO().WantCaptureKeyboard)
@@ -321,9 +431,12 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
                 ts.rotationConstrained = true;
                 ts.rotationAxis = 0;
                 glfwGetCursorPos(window, &ts.rotationStartMouseX, &ts.rotationStartMouseY);
+                // Sauvegarder toutes les rotations, pas seulement l'axe concerné
                 for (size_t i = 0; i < selectedShapes.size(); i++) {
                     int idx = selectedShapes[i];
                     ts.rotationOriginalRotations[i][0] = shapes[idx].rotation[0];
+                    ts.rotationOriginalRotations[i][1] = shapes[idx].rotation[1];
+                    ts.rotationOriginalRotations[i][2] = shapes[idx].rotation[2];
                 }
             }
             else if (glfwGetKey(window, GLFW_KEY_Y) == GLFW_PRESS)
@@ -331,9 +444,12 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
                 ts.rotationConstrained = true;
                 ts.rotationAxis = 1;
                 glfwGetCursorPos(window, &ts.rotationStartMouseX, &ts.rotationStartMouseY);
+                // Sauvegarder toutes les rotations, pas seulement l'axe concerné
                 for (size_t i = 0; i < selectedShapes.size(); i++) {
                     int idx = selectedShapes[i];
+                    ts.rotationOriginalRotations[i][0] = shapes[idx].rotation[0];
                     ts.rotationOriginalRotations[i][1] = shapes[idx].rotation[1];
+                    ts.rotationOriginalRotations[i][2] = shapes[idx].rotation[2];
                 }
             }
             else if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS)
@@ -341,8 +457,11 @@ void InputManager::processTransformationUpdates(GLFWwindow* window, std::vector<
                 ts.rotationConstrained = true;
                 ts.rotationAxis = 2;
                 glfwGetCursorPos(window, &ts.rotationStartMouseX, &ts.rotationStartMouseY);
+                // Sauvegarder toutes les rotations, pas seulement l'axe concerné
                 for (size_t i = 0; i < selectedShapes.size(); i++) {
                     int idx = selectedShapes[i];
+                    ts.rotationOriginalRotations[i][0] = shapes[idx].rotation[0];
+                    ts.rotationOriginalRotations[i][1] = shapes[idx].rotation[1];
                     ts.rotationOriginalRotations[i][2] = shapes[idx].rotation[2];
                 }
             }
