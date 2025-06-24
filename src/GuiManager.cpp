@@ -1,4 +1,5 @@
 #include "GuiManager.h"
+#include "MeshExporter.h"
 #include <algorithm>
 #include <cstring>
 #include <sstream>
@@ -374,9 +375,22 @@ void GUIManager::renderGUI(GLFWwindow* window, std::vector<Shape>& shapes, std::
 
     ImGui::SetNextWindowPos(ImVec2(380, 0), ImGuiCond_Always);
     ImGui::SetNextWindowBgAlpha(0.0f);
-    ImGui::SetNextWindowSize(ImVec2(134, 38), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(200, 72), ImGuiCond_Always);
     ImGui::Begin("Overlays", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar);
     ImGui::Checkbox("hide Overlays", &altRenderMode);
+    
+    // Export button
+    if (ImGui::Button("Export to OBJ", ImVec2(120, 25))) {
+        if (!shapes.empty()) {
+            std::string filename = "exported_mesh.obj";
+            bool success = MeshExporter::exportToOBJ(shapes, filename, 64, 10.0f);
+            if (success) {
+                std::cout << "Mesh exported successfully to " << filename << std::endl;
+            } else {
+                std::cerr << "Failed to export mesh!" << std::endl;
+            }
+        }
+    }
     ImGui::End();
 
     ImGui::SetNextWindowPos(ImVec2(-1, winHeight - 45), ImGuiCond_Always);

@@ -66,6 +66,8 @@ add_executable(${PROJECT_NAME}
     src/Utilities.cpp
     src/Renderer.cpp
     src/GuiManager.cpp
+    src/MeshExporter.cpp
+    src/MarchingCubesTables.cpp
 )
 
 # -------------------------------

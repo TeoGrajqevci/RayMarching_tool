@@ -9,6 +9,7 @@
 #include "ImGuiLayer.h"
 #include "imgui.h"
 #include "Shapes.h"
+#include "MeshExporter.h"
 
 class GUIManager {
 public:
