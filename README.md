@@ -1,4 +1,3 @@
-<img width="1250" height="1261" alt="raymarch_cornel_box" src="https://github.com/user-attachments/assets/b16b9ccd-1d69-4eb1-b09d-3613eb798664" /># Ray Marching Tool
 
 Ray Marching Tool is an interactive SDF modeling app written in C++ with OpenGL + ImGui.
 It supports real-time ray marching, a path tracer mode, shape modifiers, and OBJ export via marching cubes.
