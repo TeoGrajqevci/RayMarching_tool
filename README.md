@@ -1,4 +1,3 @@
-<img width="1252" height="1287" alt="Capture d’écran 2026-02-12 à 16 06 47" src="https://github.com/user-attachments/assets/0de5a76f-2e7f-489e-9d3a-5e1fcadc01b3" /># Ray Marching Tool
 
 A **3D modeling tool** written in **C++** and using **OpenGL**, leveraging **Signed Distance Fields (SDFs)** to create, blend, and manipulate primitive shapes.
 
@@ -41,7 +40,7 @@ A **3D modeling tool** written in **C++** and using **OpenGL**, leveraging **Sig
 
 ## Preview
 
-![Uploading raymarch_cornel_box.png…]()
+<img width="1252" height="1287" alt="Capture d’écran 2026-02-12 à 16 06 47" src="https://github.com/user-attachments/assets/0de5a76f-2e7f-489e-9d3a-5e1fcadc01b3" /># Ray Marching Tool
 
 ---
 
