@@ -52,6 +52,7 @@ Shader::Shader(const char* vertexPath, const char* fragmentPath) {
     }
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
+    uniformLocationCache.clear();
 }
 
 void Shader::use() const {
@@ -59,23 +60,44 @@ void Shader::use() const {
 }
 
 void Shader::setBool(const std::string &name, bool value) const {
-    glUniform1i(glGetUniformLocation(ID, name.c_str()), (int)value);
+    glUniform1i(getUniformLocation(name), static_cast<int>(value));
 }
 void Shader::setInt(const std::string &name, int value) const {
-    glUniform1i(glGetUniformLocation(ID, name.c_str()), value);
+    glUniform1i(getUniformLocation(name), value);
 }
 void Shader::setFloat(const std::string &name, float value) const {
-    glUniform1f(glGetUniformLocation(ID, name.c_str()), value);
+    glUniform1f(getUniformLocation(name), value);
 }
 void Shader::setVec2(const std::string &name, float x, float y) const {
-    glUniform2f(glGetUniformLocation(ID, name.c_str()), x, y);
+    glUniform2f(getUniformLocation(name), x, y);
 }
 void Shader::setVec3(const std::string &name, float x, float y, float z) const {
-    glUniform3f(glGetUniformLocation(ID, name.c_str()), x, y, z);
+    glUniform3f(getUniformLocation(name), x, y, z);
+}
+void Shader::setIVec3(const std::string &name, int x, int y, int z) const {
+    glUniform3i(getUniformLocation(name), x, y, z);
 }
 void Shader::setVec4(const std::string &name, float x, float y, float z, float w) const {
-    glUniform4f(glGetUniformLocation(ID, name.c_str()), x, y, z, w);
+    glUniform4f(getUniformLocation(name), x, y, z, w);
 }
 void Shader::setMat4(const std::string &name, const float* mat) const {
-    glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, mat);
+    glUniformMatrix4fv(getUniformLocation(name), 1, GL_FALSE, mat);
+}
+
+void Shader::setIntArray(const std::string& name, const int* values, int count) const {
+    if (values == nullptr || count <= 0) {
+        return;
+    }
+    glUniform1iv(getUniformLocation(name), count, values);
+}
+
+GLint Shader::getUniformLocation(const std::string& name) const {
+    const std::unordered_map<std::string, GLint>::const_iterator it = uniformLocationCache.find(name);
+    if (it != uniformLocationCache.end()) {
+        return it->second;
+    }
+
+    const GLint location = glGetUniformLocation(ID, name.c_str());
+    uniformLocationCache[name] = location;
+    return location;
 }

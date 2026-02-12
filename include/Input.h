@@ -14,6 +14,8 @@ struct GLFWwindow;
 #include "imgui.h"
 
 struct TransformationState {
+    bool useLocalSpace = false; // false: world, true: local
+
     bool translationModeActive = false;
     bool rotationModeActive = false;
     bool scaleModeActive = false;
@@ -33,7 +35,8 @@ struct TransformationState {
     bool scaleConstrained = false;
     int scaleAxis = -1;
     double scaleStartMouseX = 0.0, scaleStartMouseY = 0.0;
-    std::vector<std::array<float, 3>> scaleOriginalParams;
+    std::vector<std::array<float, 3>> scaleOriginalScales;
+    std::vector<std::array<float, 3>> scaleOriginalElongations;
 
     bool translationKeyHandled = false;
     bool rotationKeyHandled = false;
@@ -43,6 +46,18 @@ struct TransformationState {
     bool showAxisGuides = false;
     int activeAxis = -1; // 0=X, 1=Y, 2=Z
     float guideCenter[3] = {0.0f, 0.0f, 0.0f}; // Centre du guide (centre de la forme sélectionnée)
+    float guideAxisDirection[3] = {1.0f, 0.0f, 0.0f}; // Direction monde de l'axe actif
+
+    bool mirrorHelperSelected = false;
+    int mirrorHelperShapeIndex = -1;
+    int mirrorHelperAxis = -1; // Plane normal axis (X/Y/Z)
+    bool mirrorHelperMoveModeActive = false;
+    bool mirrorHelperMoveConstrained = false;
+    int mirrorHelperMoveAxis = -1;
+    double mirrorHelperMoveStartMouseX = 0.0;
+    double mirrorHelperMoveStartMouseY = 0.0;
+    float mirrorHelperMoveStartOffset[3] = {0.0f, 0.0f, 0.0f};
+    float mirrorHelperMoveStartShapeCenter[3] = {0.0f, 0.0f, 0.0f};
 };
 
 class InputManager {
@@ -53,12 +68,15 @@ public:
     void processGeneralInput(GLFWwindow* window, std::vector<Shape>& shapes, std::vector<int>& selectedShapes, float cameraTarget[3], bool& showGUI, bool& altRenderMode, const TransformationState& ts);
     void processTransformationModeActivation(GLFWwindow* window, std::vector<Shape>& shapes, std::vector<int>& selectedShapes, TransformationState& ts);
     void processTransformationUpdates(GLFWwindow* window, std::vector<Shape>& shapes, std::vector<int>& selectedShapes,
-                                      TransformationState& ts, const float cameraPos[3], const float cameraTarget[3]);
+                                      TransformationState& ts, const float cameraPos[3], const float cameraTarget[3],
+                                      const ImVec2& viewportPos, const ImVec2& viewportSize);
     void processMousePickingAndCameraDrag(GLFWwindow* window, std::vector<Shape>& shapes, std::vector<int>& selectedShapes,
                                           float cameraPos[3], float cameraTarget[3],
                                           float& camTheta, float& camPhi,
                                           bool& cameraDragging, double& lastMouseX, double& lastMouseY,
-                                          bool& mouseWasPressed);
+                                          bool& mouseWasPressed,
+                                          TransformationState& ts,
+                                          const ImVec2& viewportPos, const ImVec2& viewportSize);
 };
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);

@@ -47,15 +47,8 @@ private:
                                   int resolution,
                                   float boundingBoxSize);
     
-    // Sample SDF at a point considering all shapes and blend operations
-    static float sampleSDF(const std::vector<Shape>& shapes, float x, float y, float z);
-    
-    // Apply blend operations
-    static float applyBlendOperation(float d1, float d2, int blendOp, float smoothness);
-    
-    // Smooth min/max functions for blending
-    static float smoothMin(float a, float b, float k);
-    static float smoothMax(float a, float b, float k);
+    // Sample SDF at a point using precomputed runtime shape data.
+    static float sampleSDF(const std::vector<RuntimeShapeData>& runtimeShapes, float x, float y, float z);
     
     // Marching cubes lookup tables
     static const int edgeTable[256];

@@ -129,19 +129,30 @@ Mesh MeshExporter::generateMeshFromSDF(const std::vector<Shape>& shapes,
     float stepX = (maxX - minX) / (resolution - 1);
     float stepY = (maxY - minY) / (resolution - 1);
     float stepZ = (maxZ - minZ) / (resolution - 1);
-    
-    // Pre-compute SDF values for all grid points
-    std::vector<std::vector<std::vector<float>>> sdfValues(resolution, 
-        std::vector<std::vector<float>>(resolution, 
-            std::vector<float>(resolution)));
-    
-    for (int x = 0; x < resolution; x++) {
-        for (int y = 0; y < resolution; y++) {
-            for (int z = 0; z < resolution; z++) {
-                float worldX = minX + x * stepX;
-                float worldY = minY + y * stepY;
-                float worldZ = minZ + z * stepZ;
-                sdfValues[x][y][z] = sampleSDF(shapes, worldX, worldY, worldZ);
+
+    const std::vector<RuntimeShapeData> runtimeShapes = buildRuntimeShapeDataList(shapes);
+
+    // Pre-compute SDF values for all grid points in a contiguous buffer.
+    const std::size_t gridSize = static_cast<std::size_t>(resolution) *
+                                 static_cast<std::size_t>(resolution) *
+                                 static_cast<std::size_t>(resolution);
+    std::vector<float> sdfValues(gridSize, 0.0f);
+    const auto sdfIndex = [resolution](int x, int y, int z) -> std::size_t {
+        return (static_cast<std::size_t>(x) * static_cast<std::size_t>(resolution) +
+                static_cast<std::size_t>(y)) * static_cast<std::size_t>(resolution) +
+               static_cast<std::size_t>(z);
+    };
+
+#ifdef RMT_USE_OPENMP
+#pragma omp parallel for collapse(3) schedule(static)
+#endif
+    for (int x = 0; x < resolution; ++x) {
+        for (int y = 0; y < resolution; ++y) {
+            for (int z = 0; z < resolution; ++z) {
+                const float worldX = minX + static_cast<float>(x) * stepX;
+                const float worldY = minY + static_cast<float>(y) * stepY;
+                const float worldZ = minZ + static_cast<float>(z) * stepZ;
+                sdfValues[sdfIndex(x, y, z)] = sampleSDF(runtimeShapes, worldX, worldY, worldZ);
             }
         }
     }
@@ -154,14 +165,14 @@ Mesh MeshExporter::generateMeshFromSDF(const std::vector<Shape>& shapes,
             for (int z = 0; z < resolution - 1; z++) {
                 // Get the 8 corner values of the cube
                 float cornerValues[8] = {
-                    sdfValues[x][y][z],                 // 0
-                    sdfValues[x+1][y][z],               // 1
-                    sdfValues[x+1][y+1][z],             // 2
-                    sdfValues[x][y+1][z],               // 3
-                    sdfValues[x][y][z+1],               // 4
-                    sdfValues[x+1][y][z+1],             // 5
-                    sdfValues[x+1][y+1][z+1],           // 6
-                    sdfValues[x][y+1][z+1]              // 7
+                    sdfValues[sdfIndex(x, y, z)],             // 0
+                    sdfValues[sdfIndex(x + 1, y, z)],         // 1
+                    sdfValues[sdfIndex(x + 1, y + 1, z)],     // 2
+                    sdfValues[sdfIndex(x, y + 1, z)],         // 3
+                    sdfValues[sdfIndex(x, y, z + 1)],         // 4
+                    sdfValues[sdfIndex(x + 1, y, z + 1)],     // 5
+                    sdfValues[sdfIndex(x + 1, y + 1, z + 1)], // 6
+                    sdfValues[sdfIndex(x, y + 1, z + 1)]      // 7
                 };
                 
                 // Get cube configuration
@@ -224,70 +235,13 @@ Mesh MeshExporter::generateMeshFromSDF(const std::vector<Shape>& shapes,
     return mesh;
 }
 
-float MeshExporter::sampleSDF(const std::vector<Shape>& shapes, float x, float y, float z) {
-    if (shapes.empty()) return 1.0f;
-    
-    float p[3] = {x, y, z};
-    float result = std::numeric_limits<float>::max();
-    bool firstShape = true;
-    
-    for (const Shape& shape : shapes) {
-        float d = std::numeric_limits<float>::max();
-        
-        // Calculate distance based on shape type
-        switch (shape.type) {
-            case SHAPE_SPHERE:
-                d = sdSphereCPU(p, shape);
-                break;
-            case SHAPE_BOX:
-                d = sdBoxCPU(p, shape);
-                break;
-            case SHAPE_ROUNDBOX:
-                d = sdRoundBoxCPU(p, shape);
-                break;
-            case SHAPE_TORUS:
-                d = sdTorusCPU(p, shape);
-                break;
-            case SHAPE_CYLINDER:
-                d = sdCylinderCPU(p, shape);
-                break;
-        }
-        
-        // Apply blend operation
-        if (firstShape) {
-            result = d;
-            firstShape = false;
-        } else {
-            result = applyBlendOperation(result, d, shape.blendOp, shape.smoothness);
-        }
+float MeshExporter::sampleSDF(const std::vector<RuntimeShapeData>& runtimeShapes, float x, float y, float z) {
+    if (runtimeShapes.empty()) {
+        return 1.0f;
     }
-    
-    return result;
-}
 
-float MeshExporter::applyBlendOperation(float d1, float d2, int blendOp, float smoothness) {
-    switch (blendOp) {
-        case BLEND_NONE:
-            return std::min(d1, d2);
-        case BLEND_SMOOTH_UNION:
-            return smoothMin(d1, d2, smoothness);
-        case BLEND_SMOOTH_SUBTRACTION:
-            return smoothMax(d1, -d2, smoothness);
-        case BLEND_SMOOTH_INTERSECTION:
-            return smoothMax(d1, d2, smoothness);
-        default:
-            return std::min(d1, d2);
-    }
-}
-
-float MeshExporter::smoothMin(float a, float b, float k) {
-    if (k <= 0.0f) return std::min(a, b);
-    float h = std::max(k - std::abs(a - b), 0.0f);
-    return std::min(a, b) - h * h * 0.25f / k;
-}
-
-float MeshExporter::smoothMax(float a, float b, float k) {
-    return -smoothMin(-a, -b, k);
+    const float p[3] = { x, y, z };
+    return evaluateRuntimeSceneDistance(p, runtimeShapes);
 }
 
 Vertex MeshExporter::interpolateVertex(const Vertex& v1, const Vertex& v2, float val1, float val2, float isolevel) {
@@ -358,65 +312,87 @@ void MeshExporter::calculateBoundingBox(const std::vector<Shape>& shapes,
     maxX = maxY = maxZ = -std::numeric_limits<float>::max();
     
     for (const Shape& shape : shapes) {
-        float shapeMinX, shapeMinY, shapeMinZ;
-        float shapeMaxX, shapeMaxY, shapeMaxZ;
-        
-        // Calculate bounding box for each shape type
+        float baseRadius = 0.0f;
         switch (shape.type) {
             case SHAPE_SPHERE: {
-                float radius = shape.param[0];
-                shapeMinX = shape.center[0] - radius;
-                shapeMinY = shape.center[1] - radius;
-                shapeMinZ = shape.center[2] - radius;
-                shapeMaxX = shape.center[0] + radius;
-                shapeMaxY = shape.center[1] + radius;
-                shapeMaxZ = shape.center[2] + radius;
+                baseRadius = shape.param[0];
                 break;
             }
-            case SHAPE_BOX:
-            case SHAPE_ROUNDBOX: {
-                float extraSize = (shape.type == SHAPE_ROUNDBOX) ? shape.extra : 0.0f;
-                shapeMinX = shape.center[0] - shape.param[0] - extraSize;
-                shapeMinY = shape.center[1] - shape.param[1] - extraSize;
-                shapeMinZ = shape.center[2] - shape.param[2] - extraSize;
-                shapeMaxX = shape.center[0] + shape.param[0] + extraSize;
-                shapeMaxY = shape.center[1] + shape.param[1] + extraSize;
-                shapeMaxZ = shape.center[2] + shape.param[2] + extraSize;
+            case SHAPE_BOX: {
+                baseRadius = std::sqrt(
+                    shape.param[0] * shape.param[0] +
+                    shape.param[1] * shape.param[1] +
+                    shape.param[2] * shape.param[2]
+                );
                 break;
             }
             case SHAPE_TORUS: {
-                float majorRadius = shape.param[0];
-                float minorRadius = shape.param[1];
-                float totalRadius = majorRadius + minorRadius;
-                shapeMinX = shape.center[0] - totalRadius;
-                shapeMinY = shape.center[1] - minorRadius;
-                shapeMinZ = shape.center[2] - totalRadius;
-                shapeMaxX = shape.center[0] + totalRadius;
-                shapeMaxY = shape.center[1] + minorRadius;
-                shapeMaxZ = shape.center[2] + totalRadius;
+                baseRadius = shape.param[0] + shape.param[1];
                 break;
             }
             case SHAPE_CYLINDER: {
-                float radius = shape.param[0];
-                float halfHeight = shape.param[1];
-                shapeMinX = shape.center[0] - radius;
-                shapeMinY = shape.center[1] - halfHeight;
-                shapeMinZ = shape.center[2] - radius;
-                shapeMaxX = shape.center[0] + radius;
-                shapeMaxY = shape.center[1] + halfHeight;
-                shapeMaxZ = shape.center[2] + radius;
+                baseRadius = std::sqrt(shape.param[0] * shape.param[0] + shape.param[1] * shape.param[1]);
+                break;
+            }
+            case SHAPE_CONE: {
+                baseRadius = std::sqrt(shape.param[0] * shape.param[0] + shape.param[1] * shape.param[1]);
+                break;
+            }
+            case SHAPE_MANDELBULB: {
+                baseRadius = std::max(1.5f, std::max(shape.param[2], 2.0f) * 0.5f);
                 break;
             }
             default:
                 continue;
         }
-        
-        minX = std::min(minX, shapeMinX);
-        minY = std::min(minY, shapeMinY);
-        minZ = std::min(minZ, shapeMinZ);
-        maxX = std::max(maxX, shapeMaxX);
-        maxY = std::max(maxY, shapeMaxY);
-        maxZ = std::max(maxZ, shapeMaxZ);
+
+        float maxScale = std::max(
+            std::fabs(shape.scale[0]),
+            std::max(std::fabs(shape.scale[1]), std::fabs(shape.scale[2]))
+        );
+        baseRadius *= std::max(maxScale, 0.001f);
+
+        float eX = std::max(shape.elongation[0], 0.0f);
+        float eY = std::max(shape.elongation[1], 0.0f);
+        float eZ = std::max(shape.elongation[2], 0.0f);
+        baseRadius += std::sqrt(eX * eX + eY * eY + eZ * eZ);
+
+        baseRadius += std::max(shape.extra, 0.0f);
+        float warpBoost = 1.0f + 0.5f * (
+            std::fabs(shape.twist[0]) + std::fabs(shape.twist[1]) + std::fabs(shape.twist[2]) +
+            std::fabs(shape.bend[0]) + std::fabs(shape.bend[1]) + std::fabs(shape.bend[2])
+        );
+        float extent = baseRadius * warpBoost + 0.01f;
+        if (shape.mirrorModifierEnabled) {
+            extent += std::max(shape.mirrorSmoothness, 0.0f);
+        }
+        const int maxMirrorX = (shape.mirrorModifierEnabled && shape.mirrorAxis[0]) ? 1 : 0;
+        const int maxMirrorY = (shape.mirrorModifierEnabled && shape.mirrorAxis[1]) ? 1 : 0;
+        const int maxMirrorZ = (shape.mirrorModifierEnabled && shape.mirrorAxis[2]) ? 1 : 0;
+
+        for (int ix = 0; ix <= maxMirrorX; ++ix) {
+            for (int iy = 0; iy <= maxMirrorY; ++iy) {
+                for (int iz = 0; iz <= maxMirrorZ; ++iz) {
+                    const float cx = (ix == 1) ? (2.0f * shape.mirrorOffset[0] - shape.center[0]) : shape.center[0];
+                    const float cy = (iy == 1) ? (2.0f * shape.mirrorOffset[1] - shape.center[1]) : shape.center[1];
+                    const float cz = (iz == 1) ? (2.0f * shape.mirrorOffset[2] - shape.center[2]) : shape.center[2];
+
+                    const float shapeMinX = cx - extent;
+                    const float shapeMinY = cy - extent;
+                    const float shapeMinZ = cz - extent;
+                    const float shapeMaxX = cx + extent;
+                    const float shapeMaxY = cy + extent;
+                    const float shapeMaxZ = cz + extent;
+
+                    minX = std::min(minX, shapeMinX);
+                    minY = std::min(minY, shapeMinY);
+                    minZ = std::min(minZ, shapeMinZ);
+                    maxX = std::max(maxX, shapeMaxX);
+                    maxY = std::max(maxY, shapeMaxY);
+                    maxZ = std::max(maxZ, shapeMaxZ);
+                }
+            }
+        }
     }
     
     // Ensure we have a valid bounding box
