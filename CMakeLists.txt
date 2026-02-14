@@ -87,21 +87,52 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(stb)
 
 # -------------------------------
+# Fetch assimp (OBJ/FBX import)
+# -------------------------------
+find_package(assimp QUIET)
+if((NOT assimp_FOUND AND NOT ASSIMP_FOUND) AND NOT TARGET assimp::assimp AND NOT TARGET assimp)
+    set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
+    set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT OFF CACHE BOOL "" FORCE)
+    set(ASSIMP_BUILD_OBJ_IMPORTER ON CACHE BOOL "" FORCE)
+    set(ASSIMP_BUILD_FBX_IMPORTER ON CACHE BOOL "" FORCE)
+
+    FetchContent_Declare(
+        assimp
+        GIT_REPOSITORY https://github.com/assimp/assimp.git
+        GIT_TAG v5.4.3
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(assimp)
+endif()
+
+# -------------------------------
+# Source manifests (modular layout)
+# -------------------------------
+include(${PROJECT_SOURCE_DIR}/cmake/sources_app.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/sources_common.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/sources_scene.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/sources_rendering.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/sources_input.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/sources_ui.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/sources_io.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/sources_platform.cmake)
+
+# -------------------------------
 # Create the executable target
 # -------------------------------
 add_executable(${PROJECT_NAME}
-    src/main.cpp
-    src/Shader.cpp
-    src/Texture.cpp
-    src/ImGuiLayer.cpp
-    src/Shapes.cpp
-    src/Input.cpp
-    src/Utilities.cpp
-    src/UndoRedo.cpp
-    src/Renderer.cpp
-    src/GuiManager.cpp
-    src/MeshExporter.cpp
-    src/MarchingCubesTables.cpp
+    ${RMT_APP_SOURCES}
+    ${RMT_COMMON_SOURCES}
+    ${RMT_SCENE_SOURCES}
+    ${RMT_RENDERING_SOURCES}
+    ${RMT_INPUT_SOURCES}
+    ${RMT_UI_SOURCES}
+    ${RMT_IO_SOURCES}
+    ${RMT_PLATFORM_SOURCES}
+    third_party/mesh2sdf/makelevelset3.cpp
 )
 
 # -------------------------------
@@ -110,6 +141,7 @@ add_executable(${PROJECT_NAME}
 # Your project's headers
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/third_party/mesh2sdf
     /opt/homebrew/include
 )
 # stb: for stb_image.h
@@ -147,6 +179,16 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 # -------------------------------
 find_package(OpenGL REQUIRED)
 target_link_libraries(${PROJECT_NAME} PRIVATE glfw OpenGL::GL)
+
+if(TARGET assimp::assimp)
+    target_link_libraries(${PROJECT_NAME} PRIVATE assimp::assimp)
+elseif(TARGET assimp)
+    target_link_libraries(${PROJECT_NAME} PRIVATE assimp)
+elseif(assimp_FOUND OR ASSIMP_FOUND)
+    target_link_libraries(${PROJECT_NAME} PRIVATE assimp)
+else()
+    message(FATAL_ERROR "Assimp target was not found. OBJ/FBX mesh import requires assimp.")
+endif()
 
 if(RMT_USE_OPENMP)
     find_package(OpenMP QUIET)

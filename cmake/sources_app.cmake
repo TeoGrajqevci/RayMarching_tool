@@ -1,0 +1,12 @@
+set(RMT_APP_SOURCES
+    src/main.cpp
+    src/app/Application.cpp
+    src/app/EditorRuntime.cpp
+    src/app/OrbitCamera.cpp
+    src/app/UndoRedoManager.cpp
+    src/app/cli/BenchmarkOptionsParser.cpp
+    src/app/benchmark/BenchmarkCapture.cpp
+    src/app/benchmark/BenchmarkRunner.cpp
+    src/app/benchmark/BenchmarkReport.cpp
+    src/app/benchmark/BenchmarkScenes.cpp
+)

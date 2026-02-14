@@ -1,0 +1,15 @@
+set(RMT_UI_SOURCES
+    src/ui/UiFacade.cpp
+    src/ui/UiState.cpp
+    src/ui/layout/WorkspaceLayout.cpp
+    src/ui/panels/ToolbarPanel.cpp
+    src/ui/panels/ViewportPanel.cpp
+    src/ui/panels/ScenePanel.cpp
+    src/ui/panels/ModifierPanel.cpp
+    src/ui/panels/InspectorPanel.cpp
+    src/ui/panels/ShortcutsPanel.cpp
+    src/ui/panels/ExportDialogPanel.cpp
+    src/ui/gizmo/GizmoController.cpp
+    src/ui/style/ImGuiTheme.cpp
+    src/ui/console/Console.cpp
+)

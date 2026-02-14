@@ -1,0 +1,13 @@
+set(RMT_IO_SOURCES
+    src/io/mesh/MeshSdfRegistry.cpp
+    src/io/mesh/import/MeshImporter.cpp
+    src/io/mesh/import/AssimpMeshLoader.cpp
+    src/io/mesh/import/MeshNormalizer.cpp
+    src/io/mesh/import/SdfVoxelizer.cpp
+    src/io/mesh/import/ImportedShapeFactory.cpp
+    src/io/mesh/export/MeshExporter.cpp
+    src/io/mesh/export/MarchingCubesRunner.cpp
+    src/io/mesh/export/ObjWriter.cpp
+    src/io/mesh/export/BoundingBoxEstimator.cpp
+    src/io/mesh/export/MarchingCubesTables.cpp
+)

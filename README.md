@@ -1,108 +1,126 @@
 # Ray Marching Tool
 
-A **3D modeling tool** written in **C++** and using **OpenGL**, leveraging **Signed Distance Fields (SDFs)** to create, blend, and manipulate primitive shapes.
-
-> **Note**: This is an early-stage project. Proper HDRi support, an improved raster-based renderer, and a path tracing renderer are in progress. Future plans include additional blend modes, multiple lights, more parameters, and a wider range of primitive shapes.
-
----
-
-## Table of Contents
-
-1. [Features](#features)
-2. [Preview](#preview)
-3. [Getting Started](#getting-started)
-4. [Building from Source](#building-from-source)
-5. [Usage](#usage)
-
----
-
-## Features
-
-- **SDF Modeling**
-  - Add or remove primitive shapes (currently sphere, box, cylinder, torus, with more on the way).
-  - Apply blending operations: **Union**, **Subtract**, **Intersect**.
-  - Control blending smoothness per shape.
-
-- **Shape Hierarchy**
-  - Blend modes depend on their position in the shape directory hierarchy.
-
-- **Color & Lighting Controls**
-  - Change the color of shapes individually.
-  - Adjust the light color, position, and intensity.
-
-- **Interactive Interface**
-  - Real-time feedback using an ImGui-based GUI.
-  - Transform shapes (translate, rotate, scale) via a user-friendly interface and key-bingings.
-
-- **Rendering**
-  - OpenGL raster-based rendering (improvements in progress).
-  - **HDRi support** (in progress).
-  - **Path tracing renderer** (in progress).
-
----
+Ray Marching Tool is an interactive SDF modeling app written in C++ with OpenGL + ImGui.
+It supports real-time ray marching, a path tracer mode, shape modifiers, mesh import to SDF (OBJ/FBX), and OBJ export via marching cubes.
 
 ## Preview
 
-![RayMarchinTool](https://github.com/user-attachments/assets/a2c211f0-e0d0-4584-a530-af325847e369)
+<img width="1252" height="1287" alt="Capture d’écran 2026-02-12 à 16 06 47" src="https://github.com/user-attachments/assets/0de5a76f-2e7f-489e-9d3a-5e1fcadc01b3" /># Ray Marching Tool
 
----
+## Current Features
 
-## Getting Started
+- SDF primitives: Sphere, Box, Torus, Cylinder, Cone, Mandelbulb
+- Blend modes: Smooth Union, Smooth Subtraction, Smooth Intersection
+- Modifiers: Bend, Twist, Mirror (with axis and smoothness controls)
+- Transform workflows:
+  - Keyboard transform mode (`G` / `R` / `S`)
+  - Viewport gizmo (World/Local mode)
+  - Axis constraints (`X` / `Y` / `Z`)
+- Rendering modes:
+  - Real-time ray marching renderer
+  - Path tracer renderer with accumulation
+  - Optional OpenImageDenoise denoising (when a GPU-backed OIDN runtime is detected)
+- Material controls:
+  - Albedo, Metallic, Roughness, Emission, Transmission, IOR
+- Scene operations:
+  - Multi-select, duplicate, reorder, rename
+  - Undo/redo (`Ctrl+Z`, `Ctrl+Y`, `Ctrl+Shift+Z`)
+- Mesh export:
+  - Export current SDF scene to `.obj` using marching cubes
+- Mesh import:
+  - Drag and drop `.obj` / `.fbx` files into the viewport
+  - Imported meshes are converted to SDF volumes using `mesh2sdf`
 
-These instructions will help you set up a copy of the project on your local machine for development and testing.
+## Requirements
 
-### Prerequisites
+- CMake `>= 3.11`
+- C++11 compiler (clang/gcc/MSVC)
+- OpenGL 3.3 Core compatible GPU/driver
+- Internet access during first CMake configure (dependencies are fetched automatically)
 
-- A C++ compiler supporting C++11 or later (e.g., gcc, clang, or MSVC).
-- CMake 3.11 or higher.
-- Git for cloning the repository (optional but recommended).
+Optional:
 
-### Cloning the Repository
+- OpenMP for faster CPU-side mesh export (`-DRMT_USE_OPENMP=ON`)
+- OpenImageDenoise with a GPU backend for path-tracer denoising
+
+## Build
 
 ```bash
-git clone https://github.com/TeoGrajqevci/RayMarching_tool.git
-cd RayMarching_tool
-```
-
-### Creating a Build Directory
-
-From the root of the project:
-
-```bash
-mkdir build
+mkdir -p build
 cd build
-```
-
-### Configuring with CMake
-
-Run CMake to configure the project and download external dependencies (GLAD, ImGui, GLFW, stb):
-
-```bash
 cmake ..
-```
-
-### Compilation
-
-Once the configuration is complete:
-
-```bash
 cmake --build . --parallel
 ```
 
-or
-
-```bash
-cmake --build . --parallel <N>
-```
-
-After compilation, you will get an executable named `RayMarchingTool`.
-
-### Execution
-
-Run the compiled binary from the build directory:
+Run from the build directory:
 
 ```bash
 ./RayMarchingTool
 ```
 
----
+## Useful CMake Options
+
+- `-DRMT_FAST_FIRST_BUILD=ON|OFF`
+  - `ON` (default): shallow clones + skip dependency update checks
+- `-DRMT_USE_OPENMP=ON|OFF`
+  - `ON`: enables OpenMP for heavy CPU loops (notably mesh export), when compiler support exists
+
+Example:
+
+```bash
+cmake .. -DRMT_USE_OPENMP=ON -DRMT_FAST_FIRST_BUILD=ON
+```
+
+## Shader Organization
+
+- `shaders/Solid_renderer.glsl` and `shaders/Pathtracer.glsl` are now entry files.
+- They include modular files from:
+  - `shaders/solid/`
+  - `shaders/pathtracer/`
+- The shader loader supports local `#include "..."` directives recursively.
+
+This keeps rendering logic unchanged while making shader code easier to navigate and edit.
+
+## Command-Line Benchmark Option
+
+You can auto-generate a benchmark scene with an even mix of shape types:
+
+```bash
+./RayMarchingTool --benchmark-even-mix=1000
+```
+
+or
+
+```bash
+./RayMarchingTool --benchmark-even-mix 1000
+```
+
+## Controls
+
+- `LMB drag`: orbit camera
+- `Shift + LMB drag`: pan camera
+- `Mouse wheel`: zoom
+- `Shift + A`: open Add Shape popup
+- `LMB`: select shape (viewport picking)
+- `Drag & drop OBJ/FBX in viewport`: import mesh as SDF shape
+- `Shift + Click`: toggle multi-selection
+- `G` / `R` / `S`: enter move / rotate / scale modes
+- `X` / `Y` / `Z` during transform: axis constraint
+- `Esc`: cancel active transform
+- `Shift + D`: duplicate selected shapes
+- `X` (outside transform mode): delete selection
+- `C`: focus camera on last selected shape
+- `H`: toggle UI visibility
+- `Ctrl + Z`: undo
+- `Ctrl + Y` or `Ctrl + Shift + Z`: redo
+
+## Exporting Meshes
+
+Use the top toolbar button `Export OBJ`:
+
+1. Set output filename/path
+2. Choose export resolution
+3. Set bounding box size
+4. Export to OBJ
+
+Higher resolutions produce more detail but require more time and memory.

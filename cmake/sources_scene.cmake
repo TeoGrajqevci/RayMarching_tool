@@ -1,0 +1,9 @@
+set(RMT_SCENE_SOURCES
+    src/scene/primitives/PrimitiveDistance.cpp
+    src/scene/modifiers/ShapeModifiers.cpp
+    src/scene/blending/BlendOps.cpp
+    src/scene/RuntimeShapeBuilder.cpp
+    src/scene/RuntimeSceneEvaluator.cpp
+    src/scene/EvalStats.cpp
+    src/scene/RayPicker.cpp
+)

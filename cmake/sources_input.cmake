@@ -1,0 +1,10 @@
+set(RMT_INPUT_SOURCES
+    src/input/InputController.cpp
+    src/input/GeneralShortcuts.cpp
+    src/input/ViewportInteraction.cpp
+    src/input/transform/TransformModeActivator.cpp
+    src/input/transform/MirrorHelperTool.cpp
+    src/input/transform/TranslationTool.cpp
+    src/input/transform/RotationTool.cpp
+    src/input/transform/ScaleTool.cpp
+)

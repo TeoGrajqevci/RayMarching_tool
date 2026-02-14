@@ -1,13 +1,8 @@
 #ifndef IMGUI_LAYER_H
 #define IMGUI_LAYER_H
 
-#include <GLFW/glfw3.h>
+#include "rmt/platform/imgui/ImGuiLayer.h"
 
-namespace ImGuiLayer {
-    void Init(GLFWwindow* window);
-    void NewFrame();
-    void Render();
-    void Shutdown();
-}
+using namespace rmt;
 
-#endif
+#endif // IMGUI_LAYER_H

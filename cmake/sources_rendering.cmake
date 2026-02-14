@@ -1,0 +1,15 @@
+set(RMT_RENDERING_SOURCES
+    src/rendering/Renderer.cpp
+    src/rendering/RendererState.cpp
+    src/rendering/UniformUploader.cpp
+    src/rendering/SceneHasher.cpp
+    src/rendering/SceneBufferPacker.cpp
+    src/rendering/AccelerationGridBuilder.cpp
+    src/rendering/PathTracerResources.cpp
+    src/rendering/PathTracerPipeline.cpp
+    src/rendering/MirrorHelperUniforms.cpp
+    src/rendering/PerfTelemetry.cpp
+    src/rendering/DebugCounterReader.cpp
+    src/rendering/ShaderProgram.cpp
+    src/rendering/Texture2D.cpp
+)

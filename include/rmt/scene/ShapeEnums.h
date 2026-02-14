@@ -1,0 +1,39 @@
+#pragma once
+
+namespace rmt {
+
+enum ShapeType {
+    SHAPE_SPHERE = 0,
+    SHAPE_BOX = 1,
+    SHAPE_TORUS = 2,
+    SHAPE_CYLINDER = 3,
+    SHAPE_CONE = 4,
+    SHAPE_MANDELBULB = 5,
+    SHAPE_MENGER_SPONGE = 6,
+    SHAPE_MESH_SDF = 7
+};
+
+enum BlendMode {
+    BLEND_NONE = 0,
+    BLEND_SMOOTH_UNION = 1,
+    BLEND_SMOOTH_SUBTRACTION = 2,
+    BLEND_SMOOTH_INTERSECTION = 3
+};
+
+enum ScaleMode {
+    SCALE_MODE_DEFORM = 0,
+    SCALE_MODE_ELONGATE = 1
+};
+
+enum RuntimeShapeFlags {
+    RUNTIME_SHAPE_HAS_ROTATION = 1 << 0,
+    RUNTIME_SHAPE_HAS_SCALE = 1 << 1,
+    RUNTIME_SHAPE_HAS_ELONGATION = 1 << 2,
+    RUNTIME_SHAPE_HAS_ROUNDING = 1 << 3,
+    RUNTIME_SHAPE_HAS_TWIST = 1 << 4,
+    RUNTIME_SHAPE_HAS_BEND = 1 << 5,
+    RUNTIME_SHAPE_SCALE_MODE_ELONGATE = 1 << 6,
+    RUNTIME_SHAPE_HAS_MIRROR = 1 << 7
+};
+
+} // namespace rmt
