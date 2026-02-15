@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 
@@ -134,6 +135,8 @@ Renderer::Renderer(GLuint vao)
     try {
         oidn::DeviceType selectedType = oidn::DeviceType::CPU;
         std::string selectedName;
+        std::ostringstream gpuInitReport;
+        bool gpuCandidateDetected = false;
 
         const int physicalDeviceCount = oidn::getNumPhysicalDevices();
         for (int i = 0; i < physicalDeviceCount; ++i) {
@@ -143,32 +146,64 @@ Renderer::Renderer(GLuint vao)
                 continue;
             }
 
+            gpuCandidateDetected = true;
+            const std::string candidateName = physicalDevice.get<std::string>("name");
+
             oidn::DeviceRef candidate = physicalDevice.newDevice();
             if (!candidate) {
+                gpuInitReport << " - " << deviceTypeName(type);
+                if (!candidateName.empty()) {
+                    gpuInitReport << " \"" << candidateName << "\"";
+                }
+                gpuInitReport << ": device creation failed\n";
+                continue;
+            }
+
+            candidate.commit();
+            const char* candidateError = nullptr;
+            if (candidate.getError(candidateError) != oidn::Error::None) {
+                gpuInitReport << " - " << deviceTypeName(type);
+                if (!candidateName.empty()) {
+                    gpuInitReport << " \"" << candidateName << "\"";
+                }
+                gpuInitReport << ": "
+                              << (candidateError != nullptr ? candidateError : "unknown device error")
+                              << "\n";
                 continue;
             }
 
             selectedType = type;
-            selectedName = physicalDevice.get<std::string>("name");
+            selectedName = candidateName;
             oidnDevice = candidate;
             break;
         }
 
         if (!oidnDevice) {
-            throw std::runtime_error("No OIDN GPU device found. CPU denoiser fallback is disabled.");
-        }
+            oidnDevice = oidn::newDevice(oidn::DeviceType::CPU);
+            if (!oidnDevice) {
+                throw std::runtime_error("Failed to create OIDN CPU device");
+            }
 
-        oidnDevice.commit();
-        const char* deviceError = nullptr;
-        if (oidnDevice.getError(deviceError) != oidn::Error::None) {
-            throw std::runtime_error(deviceError != nullptr ? deviceError : "Unknown OIDN device error");
+            oidnDevice.commit();
+            const char* cpuDeviceError = nullptr;
+            if (oidnDevice.getError(cpuDeviceError) != oidn::Error::None) {
+                throw std::runtime_error(cpuDeviceError != nullptr ? cpuDeviceError : "Unknown OIDN CPU device error");
+            }
+
+            selectedType = oidn::DeviceType::CPU;
+            denoiserUsingGPU = false;
+            std::cerr << "OIDN GPU init unavailable, using CPU denoiser instead." << std::endl;
+            if (gpuCandidateDetected && !gpuInitReport.str().empty()) {
+                std::cerr << "OIDN GPU probe details:\n" << gpuInitReport.str();
+            }
+        } else {
+            denoiserUsingGPU = true;
         }
 
         oidnFilter = oidnDevice.newFilter("RT");
         denoiserAvailable = true;
-        denoiserUsingGPU = true;
 
-        std::cout << "OIDN initialized on GPU device [" << deviceTypeName(selectedType) << "]";
+        std::cout << "OIDN initialized on device [" << deviceTypeName(selectedType) << "]";
         if (!selectedName.empty()) {
             std::cout << " \"" << selectedName << "\"";
         }

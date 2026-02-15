@@ -217,7 +217,8 @@ void renderModifierPanel(const UiWorkspaceGeometry& geometry,
             ImGui::TextUnformatted("Ambient");
             ImGui::TextUnformatted("Ambient Color");
             ImGui::ColorEdit3("##ImageAmbientColor", ambientColor);
-            ImGui::SliderFloat("Ambient Intensity##ImageAmbientIntensity", &ambientIntensity, 0.0f, 8.0f);
+            ImGui::DragFloat("Ambient Intensity##ImageAmbientIntensity", &ambientIntensity, 0.1f, 0.0f, 0.0f, "%.3f");
+            ambientIntensity = std::max(ambientIntensity, 0.0f);
 
             ImGui::Separator();
             ImGui::TextUnformatted("Background");
@@ -248,7 +249,8 @@ void renderModifierPanel(const UiWorkspaceGeometry& geometry,
 
                 ImGui::TextUnformatted("Light Color");
                 ImGui::ColorEdit3("##ModifierLightingColor", lightColor);
-                ImGui::SliderFloat("Direct Intensity##ModifierDirectIntensity", &directLightIntensity, 0.0f, 8.0f);
+                ImGui::DragFloat("Direct Intensity##ModifierDirectIntensity", &directLightIntensity, 0.1f, 0.0f, 0.0f, "%.3f");
+                directLightIntensity = std::max(directLightIntensity, 0.0f);
                 ImGui::TextDisabled("Press X to delete the selected Sun light.");
             } else if (pointSelected) {
                 PointLightState& pointLight = transformState.pointLights[static_cast<std::size_t>(transformState.selectedPointLightIndex)];
@@ -257,7 +259,8 @@ void renderModifierPanel(const UiWorkspaceGeometry& geometry,
 
                 ImGui::TextUnformatted("Point Light Color");
                 ImGui::ColorEdit3("##ModifierPointLightColor", pointLight.color);
-                ImGui::SliderFloat("Point Intensity##ModifierPointIntensity", &pointLight.intensity, 0.0f, 64.0f);
+                ImGui::DragFloat("Point Intensity##ModifierPointIntensity", &pointLight.intensity, 0.1f, 0.0f, 0.0f, "%.3f");
+                pointLight.intensity = std::max(pointLight.intensity, 0.0f);
                 ImGui::SliderFloat("Point Range##ModifierPointRange", &pointLight.range, 0.25f, 50.0f);
                 ImGui::SliderFloat("Point Radius##ModifierPointRadius", &pointLight.radius, 0.0f, 2.0f);
                 ImGui::Text("Point Lights in scene: %d", static_cast<int>(transformState.pointLights.size()));

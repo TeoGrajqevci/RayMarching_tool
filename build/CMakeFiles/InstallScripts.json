@@ -1,0 +1,10 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/cmake_install.cmake",
+		"/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/glad-build/cmake_install.cmake",
+		"/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/glfw-build/cmake_install.cmake",
+		"/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/glfw-build/src/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

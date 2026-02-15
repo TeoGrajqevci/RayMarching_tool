@@ -1,0 +1,3 @@
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/glad-subbuild/CMakeFiles/glad-populate.dir
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/glad-subbuild/CMakeFiles/edit_cache.dir
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/glad-subbuild/CMakeFiles/rebuild_cache.dir

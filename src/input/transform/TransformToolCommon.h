@@ -18,29 +18,14 @@ namespace rmt {
 inline bool isViewportClickAllowedForTransform(GLFWwindow* window,
                                                const ImVec2& viewportPos,
                                                const ImVec2& viewportSize) {
-    double viewportX = viewportPos.x;
-    double viewportY = viewportPos.y;
-    double viewportW = viewportSize.x;
-    double viewportH = viewportSize.y;
-    if (viewportW <= 1.0 || viewportH <= 1.0) {
-        int winWidth = 1;
-        int winHeight = 1;
-        glfwGetWindowSize(window, &winWidth, &winHeight);
-        viewportX = 0.0;
-        viewportY = 0.0;
-        viewportW = std::max(1, winWidth);
-        viewportH = std::max(1, winHeight);
-    }
+    (void)viewportPos;
+    (void)viewportSize;
 
     double mouseX = 0.0;
     double mouseY = 0.0;
     glfwGetCursorPos(window, &mouseX, &mouseY);
-    const bool mouseInViewport =
-        mouseX >= viewportX && mouseX <= (viewportX + viewportW) &&
-        mouseY >= viewportY && mouseY <= (viewportY + viewportH);
-    const bool blockByUiPanel = ImGui::GetIO().WantCaptureMouse && !mouseInViewport;
-
-    return !blockByUiPanel && glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+    return !shouldBlockViewportInput(mouseX, mouseY) &&
+           glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
 }
 
 inline void rotateAroundAxis(float point[3], const float center[3], float axis[3], float angle) {

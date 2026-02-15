@@ -1,0 +1,3 @@
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/CMakeFiles/imguizmo-populate.dir
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/CMakeFiles/edit_cache.dir
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/CMakeFiles/rebuild_cache.dir

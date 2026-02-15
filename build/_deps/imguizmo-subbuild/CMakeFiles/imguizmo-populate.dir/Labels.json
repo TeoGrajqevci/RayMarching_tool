@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/CMakeFiles/imguizmo-populate"
+		},
+		{
+			"file" : "/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/CMakeFiles/imguizmo-populate.rule"
+		},
+		{
+			"file" : "/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/CMakeFiles/imguizmo-populate-complete.rule"
+		},
+		{
+			"file" : "/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/imguizmo-populate-prefix/src/imguizmo-populate-stamp/imguizmo-populate-build.rule"
+		},
+		{
+			"file" : "/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/imguizmo-populate-prefix/src/imguizmo-populate-stamp/imguizmo-populate-configure.rule"
+		},
+		{
+			"file" : "/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/imguizmo-populate-prefix/src/imguizmo-populate-stamp/imguizmo-populate-download.rule"
+		},
+		{
+			"file" : "/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/imguizmo-populate-prefix/src/imguizmo-populate-stamp/imguizmo-populate-install.rule"
+		},
+		{
+			"file" : "/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/imguizmo-populate-prefix/src/imguizmo-populate-stamp/imguizmo-populate-mkdir.rule"
+		},
+		{
+			"file" : "/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/imguizmo-populate-prefix/src/imguizmo-populate-stamp/imguizmo-populate-patch_disconnected.rule"
+		},
+		{
+			"file" : "/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/imguizmo-populate-prefix/src/imguizmo-populate-stamp/imguizmo-populate-test.rule"
+		},
+		{
+			"file" : "/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/imguizmo-populate-prefix/src/imguizmo-populate-stamp/imguizmo-populate-update_disconnected.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"imguizmo-populate"
+		],
+		"name" : "imguizmo-populate"
+	}
+}

@@ -141,6 +141,23 @@ int runEditorRuntimeLoop(GLFWwindow* window,
             viewportSize = guiManager.getViewportSize();
         }
 
+        bool viewportHovered = runtimeState.showGui ? guiManager.isViewportHovered() : true;
+        bool uiWantsMouseCapture = runtimeState.showGui && ImGui::GetIO().WantCaptureMouse;
+        if (!runtimeState.showGui) {
+            int winWidth = 1;
+            int winHeight = 1;
+            glfwGetWindowSize(window, &winWidth, &winHeight);
+            viewportPos = ImVec2(0.0f, 0.0f);
+            viewportSize = ImVec2(static_cast<float>(std::max(1, winWidth)),
+                                  static_cast<float>(std::max(1, winHeight)));
+        }
+        updateViewportInputContext(viewportPos.x,
+                                   viewportPos.y,
+                                   viewportSize.x,
+                                   viewportSize.y,
+                                   viewportHovered,
+                                   uiWantsMouseCapture);
+
         inputManager.processGeneralInput(window,
                                          shapes,
                                          selectedShapes,

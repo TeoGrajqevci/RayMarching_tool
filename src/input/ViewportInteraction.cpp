@@ -81,7 +81,7 @@ void InputManager::processMousePickingAndCameraDrag(GLFWwindow* window,
     glfwGetCursorPos(window, &mouseX, &mouseY);
     const bool mouseInViewport = mouseX >= viewportX && mouseX <= (viewportX + viewportW) &&
                                  mouseY >= viewportY && mouseY <= (viewportY + viewportH);
-    const bool blockByUiPanel = ImGui::GetIO().WantCaptureMouse && !mouseInViewport;
+    const bool blockByUiPanel = shouldBlockViewportInput(mouseX, mouseY);
 
     auto computePickRay = [&](float outRayDir[3]) -> bool {
         if (!mouseInViewport) {

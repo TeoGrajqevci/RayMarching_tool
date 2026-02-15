@@ -9,6 +9,7 @@ namespace rmt {
 ImDrawList* renderViewportPanel(const UiWorkspaceGeometry& geometry,
                                 ImVec2& viewportPos,
                                 ImVec2& viewportSize,
-                                ImVec2& helpButtonPos);
+                                ImVec2& helpButtonPos,
+                                bool& viewportHovered);
 
 } // namespace rmt

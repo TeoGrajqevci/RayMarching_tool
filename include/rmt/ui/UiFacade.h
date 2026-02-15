@@ -26,6 +26,7 @@ public:
     void newFrame();
     ImVec2 getViewportPos() const;
     ImVec2 getViewportSize() const;
+    bool isViewportHovered() const;
 
     void renderGUI(GLFWwindow* window, std::vector<Shape>& shapes, std::vector<int>& selectedShapes,
                    float lightDir[3], float lightColor[3], float ambientColor[3], float backgroundColor[3],
@@ -43,6 +44,7 @@ public:
 private:
     ImVec2 viewportPos;
     ImVec2 viewportSize;
+    bool viewportHovered;
     UiRuntimeState uiState;
 };
 

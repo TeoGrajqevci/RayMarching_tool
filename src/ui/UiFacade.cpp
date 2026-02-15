@@ -141,7 +141,7 @@ void renderAddShapePopup(UiRuntimeState& uiState,
 } // namespace
 
 GUIManager::GUIManager()
-    : viewportPos(0.0f, 0.0f), viewportSize(1.0f, 1.0f), uiState() {}
+    : viewportPos(0.0f, 0.0f), viewportSize(1.0f, 1.0f), viewportHovered(false), uiState() {}
 
 GUIManager::~GUIManager() {}
 
@@ -151,6 +151,10 @@ ImVec2 GUIManager::getViewportPos() const {
 
 ImVec2 GUIManager::getViewportSize() const {
     return viewportSize;
+}
+
+bool GUIManager::isViewportHovered() const {
+    return viewportHovered;
 }
 
 void GUIManager::newFrame() {
@@ -189,8 +193,8 @@ void GUIManager::renderGUI(GLFWwindow* window,
     renderSettings.pathTracerMaxBounces = clampUiInt(renderSettings.pathTracerMaxBounces, 1, 12);
     renderSettings.denoiseStartSample = clampUiInt(renderSettings.denoiseStartSample, 1, 4096);
     renderSettings.denoiseInterval = clampUiInt(renderSettings.denoiseInterval, 1, 1024);
-    ambientIntensity = clampUiFloat(ambientIntensity, 0.0f, 8.0f);
-    directLightIntensity = clampUiFloat(directLightIntensity, 0.0f, 8.0f);
+    ambientIntensity = std::max(ambientIntensity, 0.0f);
+    directLightIntensity = std::max(directLightIntensity, 0.0f);
 
     if (!ImGui::GetIO().WantCaptureKeyboard &&
         glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS &&
@@ -230,7 +234,11 @@ void GUIManager::renderGUI(GLFWwindow* window,
                        showHelpPopup,
                        geometry.winWidth);
 
-    ImDrawList* viewportDrawList = renderViewportPanel(geometry, viewportPos, viewportSize, helpButtonPos);
+    ImDrawList* viewportDrawList = renderViewportPanel(geometry,
+                                                       viewportPos,
+                                                       viewportSize,
+                                                       helpButtonPos,
+                                                       viewportHovered);
 
     renderScenePanel(geometry,
                      shapes,

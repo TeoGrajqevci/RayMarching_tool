@@ -1,0 +1,14 @@
+# Target labels
+ imguizmo-populate
+# Source files and their labels
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/CMakeFiles/imguizmo-populate
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/CMakeFiles/imguizmo-populate.rule
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/CMakeFiles/imguizmo-populate-complete.rule
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/imguizmo-populate-prefix/src/imguizmo-populate-stamp/imguizmo-populate-build.rule
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/imguizmo-populate-prefix/src/imguizmo-populate-stamp/imguizmo-populate-configure.rule
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/imguizmo-populate-prefix/src/imguizmo-populate-stamp/imguizmo-populate-download.rule
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/imguizmo-populate-prefix/src/imguizmo-populate-stamp/imguizmo-populate-install.rule
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/imguizmo-populate-prefix/src/imguizmo-populate-stamp/imguizmo-populate-mkdir.rule
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/imguizmo-populate-prefix/src/imguizmo-populate-stamp/imguizmo-populate-patch_disconnected.rule
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/imguizmo-populate-prefix/src/imguizmo-populate-stamp/imguizmo-populate-test.rule
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/imguizmo-subbuild/imguizmo-populate-prefix/src/imguizmo-populate-stamp/imguizmo-populate-update_disconnected.rule

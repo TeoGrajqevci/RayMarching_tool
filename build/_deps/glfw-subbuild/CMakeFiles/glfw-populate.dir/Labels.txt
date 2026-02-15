@@ -1,0 +1,14 @@
+# Target labels
+ glfw-populate
+# Source files and their labels
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/glfw-subbuild/CMakeFiles/glfw-populate
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/glfw-subbuild/CMakeFiles/glfw-populate.rule
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/glfw-subbuild/CMakeFiles/glfw-populate-complete.rule
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/glfw-subbuild/glfw-populate-prefix/src/glfw-populate-stamp/glfw-populate-build.rule
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/glfw-subbuild/glfw-populate-prefix/src/glfw-populate-stamp/glfw-populate-configure.rule
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/glfw-subbuild/glfw-populate-prefix/src/glfw-populate-stamp/glfw-populate-download.rule
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/glfw-subbuild/glfw-populate-prefix/src/glfw-populate-stamp/glfw-populate-install.rule
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/glfw-subbuild/glfw-populate-prefix/src/glfw-populate-stamp/glfw-populate-mkdir.rule
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/glfw-subbuild/glfw-populate-prefix/src/glfw-populate-stamp/glfw-populate-patch_disconnected.rule
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/glfw-subbuild/glfw-populate-prefix/src/glfw-populate-stamp/glfw-populate-test.rule
+/Users/teograjqevci/Desktop/RayMarching_tool-main copie 2/build/_deps/glfw-subbuild/glfw-populate-prefix/src/glfw-populate-stamp/glfw-populate-update_disconnected.rule

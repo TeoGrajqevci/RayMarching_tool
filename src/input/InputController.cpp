@@ -273,7 +273,7 @@ void updateSunLightTool(GLFWwindow* window,
         const bool mouseInViewport =
             mouseX >= viewportX && mouseX <= (viewportX + viewportW) &&
             mouseY >= viewportY && mouseY <= (viewportY + viewportH);
-        const bool blockByUiPanel = ImGui::GetIO().WantCaptureMouse && !mouseInViewport;
+        const bool blockByUiPanel = shouldBlockViewportInput(mouseX, mouseY);
         if (!blockByUiPanel && mouseInViewport) {
             clearMoveState();
         }
@@ -409,7 +409,7 @@ void updatePointLightTool(GLFWwindow* window,
         const bool mouseInViewport =
             mouseX >= viewportX && mouseX <= (viewportX + viewportW) &&
             mouseY >= viewportY && mouseY <= (viewportY + viewportH);
-        const bool blockByUiPanel = ImGui::GetIO().WantCaptureMouse && !mouseInViewport;
+        const bool blockByUiPanel = shouldBlockViewportInput(mouseX, mouseY);
         if (!blockByUiPanel && mouseInViewport) {
             clearMoveState();
         }

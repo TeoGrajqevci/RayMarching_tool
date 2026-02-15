@@ -9,10 +9,12 @@ namespace rmt {
 ImDrawList* renderViewportPanel(const UiWorkspaceGeometry& geometry,
                                 ImVec2& viewportPos,
                                 ImVec2& viewportSize,
-                                ImVec2& helpButtonPos) {
+                                ImVec2& helpButtonPos,
+                                bool& viewportHovered) {
     viewportPos = ImVec2(geometry.centerX, geometry.centerY);
     viewportSize = ImVec2(geometry.centerW, geometry.centerH);
     helpButtonPos = viewportPos;
+    viewportHovered = false;
 
     ImGui::SetNextWindowPos(ImVec2(geometry.centerX, geometry.centerY), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(geometry.centerW, geometry.centerH), ImGuiCond_Always);
@@ -26,6 +28,7 @@ ImDrawList* renderViewportPanel(const UiWorkspaceGeometry& geometry,
                  ImGuiWindowFlags_NoScrollWithMouse |
                  ImGuiWindowFlags_NoBackground);
     {
+        viewportHovered = ImGui::IsWindowHovered();
         viewportDrawList = ImGui::GetWindowDrawList();
         ImVec2 contentStart = ImGui::GetCursorScreenPos();
         ImVec2 contentSize = ImGui::GetContentRegionAvail();
