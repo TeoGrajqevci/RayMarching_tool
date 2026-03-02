@@ -8,6 +8,7 @@
 #include <string>
 
 #include "RendererInternal.h"
+#include "rmt/rendering/Texture2D.h"
 
 namespace rmt {
 
@@ -43,13 +44,20 @@ Renderer::Renderer(GLuint vao)
       accelShapeIndexTexture(0),
       meshSdfBufferObject(0),
       meshSdfBufferTexture(0),
+      curveNodeBufferObject(0),
+      curveNodeBufferTexture(0),
+      materialTextureCount(0),
+      materialTextureIds{0},
+      materialTextureOverflowWarningIssued(false),
       packedSceneTexels(),
       packedMeshSdfTexels(),
+      packedCurveNodeTexels(),
       accelCellRangeTexels(),
       accelShapeIndexTexels(),
       sceneTexelStride(kShapeTexelStride),
       meshSdfResolution(0),
       meshSdfCount(0),
+      curveNodeCount(0),
       maxTextureBufferTexels(0),
       maxSceneShapes(0),
       uploadedShapeCount(0),
@@ -123,6 +131,12 @@ Renderer::Renderer(GLuint vao)
     glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, meshSdfBufferObject);
     glBindTexture(GL_TEXTURE_BUFFER, 0);
 
+    glGenBuffers(1, &curveNodeBufferObject);
+    glGenTextures(1, &curveNodeBufferTexture);
+    glBindTexture(GL_TEXTURE_BUFFER, curveNodeBufferTexture);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, curveNodeBufferObject);
+    glBindTexture(GL_TEXTURE_BUFFER, 0);
+
     glGetIntegerv(GL_MAX_TEXTURE_BUFFER_SIZE, &maxTextureBufferTexels);
     maxSceneShapes = std::max(1, maxTextureBufferTexels / sceneTexelStride);
 
@@ -133,72 +147,110 @@ Renderer::Renderer(GLuint vao)
 #ifdef RMT_HAS_OIDN
     oidnBufferByteSize = 0;
     try {
-        oidn::DeviceType selectedType = oidn::DeviceType::CPU;
+        oidn::DeviceType selectedType = oidn::DeviceType::Default;
         std::string selectedName;
         std::ostringstream gpuInitReport;
         bool gpuCandidateDetected = false;
 
-        const int physicalDeviceCount = oidn::getNumPhysicalDevices();
-        for (int i = 0; i < physicalDeviceCount; ++i) {
-            oidn::PhysicalDeviceRef physicalDevice(i);
-            const oidn::DeviceType type = physicalDevice.get<oidn::DeviceType>("type");
-            if (type == oidn::DeviceType::CPU) {
-                continue;
-            }
-
-            gpuCandidateDetected = true;
-            const std::string candidateName = physicalDevice.get<std::string>("name");
-
-            oidn::DeviceRef candidate = physicalDevice.newDevice();
+        auto commitGpuCandidate = [&](oidn::DeviceRef candidate,
+                                      oidn::DeviceType requestedType,
+                                      const std::string& candidateName,
+                                      const std::string& sourceLabel) -> bool {
             if (!candidate) {
-                gpuInitReport << " - " << deviceTypeName(type);
-                if (!candidateName.empty()) {
-                    gpuInitReport << " \"" << candidateName << "\"";
-                }
-                gpuInitReport << ": device creation failed\n";
-                continue;
+                gpuInitReport << " - " << sourceLabel << " [" << deviceTypeName(requestedType) << "]"
+                              << ": device creation failed\n";
+                return false;
             }
 
             candidate.commit();
             const char* candidateError = nullptr;
             if (candidate.getError(candidateError) != oidn::Error::None) {
-                gpuInitReport << " - " << deviceTypeName(type);
+                gpuInitReport << " - " << sourceLabel << " [" << deviceTypeName(requestedType) << "]";
                 if (!candidateName.empty()) {
                     gpuInitReport << " \"" << candidateName << "\"";
                 }
                 gpuInitReport << ": "
                               << (candidateError != nullptr ? candidateError : "unknown device error")
                               << "\n";
-                continue;
+                return false;
             }
 
-            selectedType = type;
+            oidn::DeviceType actualType = requestedType;
+            try {
+                actualType = candidate.get<oidn::DeviceType>("type");
+            } catch (...) {
+            }
+
+            if (actualType == oidn::DeviceType::CPU) {
+                gpuInitReport << " - " << sourceLabel << " [" << deviceTypeName(requestedType) << "]";
+                if (!candidateName.empty()) {
+                    gpuInitReport << " \"" << candidateName << "\"";
+                }
+                gpuInitReport << ": resolved to CPU device (rejected)\n";
+                return false;
+            }
+
+            selectedType = actualType;
             selectedName = candidateName;
             oidnDevice = candidate;
-            break;
+            return true;
+        };
+
+        const oidn::DeviceType explicitGpuTypes[] = {
+            oidn::DeviceType::Metal,
+            oidn::DeviceType::CUDA,
+            oidn::DeviceType::HIP,
+            oidn::DeviceType::SYCL,
+        };
+
+        for (const oidn::DeviceType gpuType : explicitGpuTypes) {
+            oidn::DeviceRef explicitCandidate = oidn::newDevice(gpuType);
+            if (commitGpuCandidate(explicitCandidate, gpuType, std::string(), "explicit backend")) {
+                gpuCandidateDetected = true;
+                break;
+            }
         }
 
         if (!oidnDevice) {
-            oidnDevice = oidn::newDevice(oidn::DeviceType::CPU);
-            if (!oidnDevice) {
-                throw std::runtime_error("Failed to create OIDN CPU device");
-            }
+            const int physicalDeviceCount = oidn::getNumPhysicalDevices();
+            for (int i = 0; i < physicalDeviceCount; ++i) {
+                oidn::PhysicalDeviceRef physicalDevice(i);
+                const oidn::DeviceType type = physicalDevice.get<oidn::DeviceType>("type");
+                if (type == oidn::DeviceType::CPU) {
+                    continue;
+                }
 
-            oidnDevice.commit();
-            const char* cpuDeviceError = nullptr;
-            if (oidnDevice.getError(cpuDeviceError) != oidn::Error::None) {
-                throw std::runtime_error(cpuDeviceError != nullptr ? cpuDeviceError : "Unknown OIDN CPU device error");
-            }
+                gpuCandidateDetected = true;
 
-            selectedType = oidn::DeviceType::CPU;
-            denoiserUsingGPU = false;
-            std::cerr << "OIDN GPU init unavailable, using CPU denoiser instead." << std::endl;
-            if (gpuCandidateDetected && !gpuInitReport.str().empty()) {
-                std::cerr << "OIDN GPU probe details:\n" << gpuInitReport.str();
+                std::string candidateName;
+                try {
+                    candidateName = physicalDevice.get<std::string>("name");
+                } catch (...) {
+                }
+
+                oidn::DeviceRef candidate = physicalDevice.newDevice();
+                if (commitGpuCandidate(candidate, type, candidateName, "physical device")) {
+                    break;
+                }
             }
-        } else {
-            denoiserUsingGPU = true;
         }
+
+        if (!oidnDevice) {
+            std::ostringstream error;
+            error << "OIDN GPU init failed: no usable GPU device found.";
+            if (!gpuCandidateDetected) {
+                error << " No non-CPU OIDN physical devices were detected.";
+            }
+            if (!gpuInitReport.str().empty()) {
+                error << "\nOIDN GPU probe details:\n" << gpuInitReport.str();
+            }
+#if defined(__APPLE__)
+            error << "\nHint: installed OIDN appears CPU-only. Install/build OpenImageDenoise with the Metal backend (libOpenImageDenoise_device_metal*.dylib).";
+#endif
+            throw std::runtime_error(error.str());
+        }
+
+        denoiserUsingGPU = true;
 
         oidnFilter = oidnDevice.newFilter("RT");
         denoiserAvailable = true;
@@ -249,6 +301,10 @@ Renderer::~Renderer() {
         glDeleteTextures(1, &meshSdfBufferTexture);
         meshSdfBufferTexture = 0;
     }
+    if (curveNodeBufferTexture != 0) {
+        glDeleteTextures(1, &curveNodeBufferTexture);
+        curveNodeBufferTexture = 0;
+    }
 
     if (sceneBufferObject != 0) {
         glDeleteBuffers(1, &sceneBufferObject);
@@ -266,6 +322,10 @@ Renderer::~Renderer() {
         glDeleteBuffers(1, &meshSdfBufferObject);
         meshSdfBufferObject = 0;
     }
+    if (curveNodeBufferObject != 0) {
+        glDeleteBuffers(1, &curveNodeBufferObject);
+        curveNodeBufferObject = 0;
+    }
 
     if (accumulationTextures[0] != 0 || accumulationTextures[1] != 0) {
         glDeleteTextures(2, accumulationTextures);
@@ -282,6 +342,8 @@ Renderer::~Renderer() {
         glDeleteFramebuffers(1, &accumulationFBO);
         accumulationFBO = 0;
     }
+
+    releaseMaterialTextureCache();
 }
 
 void Renderer::renderScene(const std::vector<Shape>& shapes, const std::vector<int>& selectedShapes,

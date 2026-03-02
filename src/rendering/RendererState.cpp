@@ -43,6 +43,7 @@ void Renderer::renderSolid(const std::vector<Shape>& shapes, const std::vector<i
                          transformState);
 
     bindSceneBuffer(shader, 0);
+    bindMaterialTextures(shader, 5);
 
     const int maxSelected = std::min(static_cast<int>(selectedShapes.size()), kMaxSelected);
     shader.setInt("uSelectedCount", maxSelected);

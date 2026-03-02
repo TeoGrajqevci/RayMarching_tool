@@ -49,6 +49,19 @@ void MeshExporter::calculateBoundingBox(const std::vector<Shape>& shapes,
             case SHAPE_MESH_SDF:
                 baseRadius = std::sqrt(3.0f) * std::max(shape.param[0], 0.01f);
                 break;
+            case SHAPE_CURVE: {
+                baseRadius = 0.01f;
+                for (const CurveNode& node : shape.curveNodes) {
+                    const float nodeRadius = std::max(node.radius, 0.001f);
+                    const float distanceFromCenter = std::sqrt(
+                        node.position[0] * node.position[0] +
+                        node.position[1] * node.position[1] +
+                        node.position[2] * node.position[2]
+                    );
+                    baseRadius = std::max(baseRadius, distanceFromCenter + nodeRadius);
+                }
+                break;
+            }
             default:
                 continue;
         }

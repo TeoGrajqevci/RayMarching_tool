@@ -146,4 +146,23 @@ void applyCheapBendCombinedCPU(const float p[3], const float k[3], float out[3])
     out[2] = tmp[2];
 }
 
+void applyDomainRepeatCombinedCPU(const float p[3], const float axisEnabled[3], const float spacing[3], float out[3]) {
+    out[0] = p[0];
+    out[1] = p[1];
+    out[2] = p[2];
+
+    for (int axis = 0; axis < 3; ++axis) {
+        if (axisEnabled[axis] <= 0.5f) {
+            continue;
+        }
+        const float safeSpacing = std::max(std::fabs(spacing[axis]), 1e-4f);
+        const float halfSpacing = 0.5f * safeSpacing;
+        out[axis] = std::fmod(out[axis] + halfSpacing, safeSpacing);
+        if (out[axis] < 0.0f) {
+            out[axis] += safeSpacing;
+        }
+        out[axis] -= halfSpacing;
+    }
+}
+
 } // namespace rmt

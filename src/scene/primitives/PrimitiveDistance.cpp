@@ -76,6 +76,136 @@ float sdConeLocalCPU(const float p[3], float baseRadius, float halfHeight) {
     return distance * sign;
 }
 
+float sdCapsuleVariableRadiusLocalCPU(const float p[3],
+                                      const float a[3],
+                                      const float b[3],
+                                      float radiusA,
+                                      float radiusB) {
+    const float ab[3] = {
+        b[0] - a[0],
+        b[1] - a[1],
+        b[2] - a[2]
+    };
+    const float ap[3] = {
+        p[0] - a[0],
+        p[1] - a[1],
+        p[2] - a[2]
+    };
+
+    const float abLenSq = ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2];
+    float t = 0.0f;
+    if (abLenSq > 1e-8f) {
+        t = clampf((ap[0] * ab[0] + ap[1] * ab[1] + ap[2] * ab[2]) / abLenSq, 0.0f, 1.0f);
+    }
+
+    const float closest[3] = {
+        a[0] + ab[0] * t,
+        a[1] + ab[1] * t,
+        a[2] + ab[2] * t
+    };
+    const float radius = radiusA + (radiusB - radiusA) * t;
+
+    const float dx = p[0] - closest[0];
+    const float dy = p[1] - closest[1];
+    const float dz = p[2] - closest[2];
+    return std::sqrt(dx * dx + dy * dy + dz * dz) - radius;
+}
+
+float catmullRomScalar(float p0, float p1, float p2, float p3, float t) {
+    const float t2 = t * t;
+    const float t3 = t2 * t;
+    return 0.5f * (
+        (2.0f * p1) +
+        (-p0 + p2) * t +
+        (2.0f * p0 - 5.0f * p1 + 4.0f * p2 - p3) * t2 +
+        (-p0 + 3.0f * p1 - 3.0f * p2 + p3) * t3
+    );
+}
+
+void catmullRomVec3(const float p0[3],
+                    const float p1[3],
+                    const float p2[3],
+                    const float p3[3],
+                    float t,
+                    float out[3]) {
+    out[0] = catmullRomScalar(p0[0], p1[0], p2[0], p3[0], t);
+    out[1] = catmullRomScalar(p0[1], p1[1], p2[1], p3[1], t);
+    out[2] = catmullRomScalar(p0[2], p1[2], p2[2], p3[2], t);
+}
+
+float sdCurveLocalCPU(const float p[3], const RuntimeShapeData& shapeData) {
+    const int nodeCount = std::max(1, std::min(shapeData.curveNodeCount, RuntimeShapeData::kMaxCurveNodes));
+
+    if (nodeCount == 1) {
+        const float dx = p[0] - shapeData.curveNodes[0];
+        const float dy = p[1] - shapeData.curveNodes[1];
+        const float dz = p[2] - shapeData.curveNodes[2];
+        const float radius = std::max(shapeData.curveNodes[3], 0.001f);
+        return std::sqrt(dx * dx + dy * dy + dz * dz) - radius;
+    }
+
+    const int kCurveSubsegments = 12;
+    float best = kHugeDistance;
+    for (int i = 0; i < nodeCount - 1; ++i) {
+        const int i0 = std::max(i - 1, 0);
+        const int i1 = i;
+        const int i2 = i + 1;
+        const int i3 = std::min(i + 2, nodeCount - 1);
+
+        const int p0Base = i0 * 4;
+        const int p1Base = i1 * 4;
+        const int p2Base = i2 * 4;
+        const int p3Base = i3 * 4;
+
+        float p0[3] = {
+            shapeData.curveNodes[p0Base + 0],
+            shapeData.curveNodes[p0Base + 1],
+            shapeData.curveNodes[p0Base + 2]
+        };
+        float p1[3] = {
+            shapeData.curveNodes[p1Base + 0],
+            shapeData.curveNodes[p1Base + 1],
+            shapeData.curveNodes[p1Base + 2]
+        };
+        float p2[3] = {
+            shapeData.curveNodes[p2Base + 0],
+            shapeData.curveNodes[p2Base + 1],
+            shapeData.curveNodes[p2Base + 2]
+        };
+        float p3[3] = {
+            shapeData.curveNodes[p3Base + 0],
+            shapeData.curveNodes[p3Base + 1],
+            shapeData.curveNodes[p3Base + 2]
+        };
+
+        const float r0 = std::max(shapeData.curveNodes[p0Base + 3], 0.001f);
+        const float r1 = std::max(shapeData.curveNodes[p1Base + 3], 0.001f);
+        const float r2 = std::max(shapeData.curveNodes[p2Base + 3], 0.001f);
+        const float r3 = std::max(shapeData.curveNodes[p3Base + 3], 0.001f);
+
+        float prevPos[3];
+        catmullRomVec3(p0, p1, p2, p3, 0.0f, prevPos);
+        float prevRadius = std::max(catmullRomScalar(r0, r1, r2, r3, 0.0f), 0.001f);
+
+        for (int sub = 1; sub <= kCurveSubsegments; ++sub) {
+            const float t = static_cast<float>(sub) / static_cast<float>(kCurveSubsegments);
+            float currPos[3];
+            catmullRomVec3(p0, p1, p2, p3, t, currPos);
+            const float currRadius = std::max(catmullRomScalar(r0, r1, r2, r3, t), 0.001f);
+
+            const float d = sdCapsuleVariableRadiusLocalCPU(p, prevPos, currPos, prevRadius, currRadius);
+            best = std::min(best, d);
+
+            prevPos[0] = currPos[0];
+            prevPos[1] = currPos[1];
+            prevPos[2] = currPos[2];
+            prevRadius = currRadius;
+        }
+    }
+
+    return best;
+}
+
 float sdMandelbulbLocalCPU(const float p[3],
                            float power,
                            float iterationsF,
@@ -192,6 +322,8 @@ float primitiveDistanceCPU(int primitiveType, const float p[3], const RuntimeSha
             };
             return sampleMeshSDFNormalized(volumeId, normalizedP) * baseScale;
         }
+        case SHAPE_CURVE:
+            return sdCurveLocalCPU(p, shapeData);
         default:
             return kHugeDistance;
     }
@@ -240,6 +372,8 @@ float primitiveRadiusForShape(int primitiveType, const float param[4]) {
             }
             return radius;
         }
+        case SHAPE_CURVE:
+            return std::max(param[0], 0.01f);
         default:
             return 0.0f;
     }

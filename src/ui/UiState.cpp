@@ -8,12 +8,16 @@ namespace rmt {
 UiRuntimeState::UiRuntimeState()
     : addShapePopupTriggered(false),
       addShapePopupPos(0.0f, 0.0f),
-      globalScaleMode(SCALE_MODE_ELONGATE),
+    globalScaleMode(SCALE_MODE_DEFORM),
       showViewportGizmo(true),
       gizmoOperation(0),
       gizmoMode(0),
       elongateScaleDragActive(false),
       elongateScaleDragShape(-1),
+    curveNodeScaleDragActive(false),
+    curveNodeScaleDragShape(-1),
+    curveNodeScaleDragNode(-1),
+    curveNodeScaleStartRadius(0.1f),
       gizmoAxisColorsSwapped(false),
       showExportDialog(false),
       exportResolution(64),
@@ -126,6 +130,20 @@ void initShapeDefaults(Shape& newShape, int type, int globalScaleMode, std::size
     newShape.mirrorOffset[1] = 0.0f;
     newShape.mirrorOffset[2] = 0.0f;
     newShape.mirrorSmoothness = 0.0f;
+    newShape.arrayModifierEnabled = false;
+    newShape.arrayAxis[0] = false;
+    newShape.arrayAxis[1] = false;
+    newShape.arrayAxis[2] = false;
+    newShape.arraySpacing[0] = 2.0f;
+    newShape.arraySpacing[1] = 2.0f;
+    newShape.arraySpacing[2] = 2.0f;
+    newShape.arrayRepeatCount[0] = 3;
+    newShape.arrayRepeatCount[1] = 3;
+    newShape.arrayRepeatCount[2] = 3;
+    newShape.arraySmoothness = 0.0f;
+    newShape.modifierStack[0] = SHAPE_MODIFIER_BEND;
+    newShape.modifierStack[1] = SHAPE_MODIFIER_TWIST;
+    newShape.modifierStack[2] = SHAPE_MODIFIER_ARRAY;
     newShape.blendOp = BLEND_NONE;
     newShape.smoothness = 0.1f;
     newShape.name = std::to_string(shapeCount);
@@ -140,6 +158,25 @@ void initShapeDefaults(Shape& newShape, int type, int globalScaleMode, std::size
     newShape.emissionStrength = 0.0f;
     newShape.transmission = 0.0f;
     newShape.ior = 1.5f;
+    newShape.dispersion = 0.0f;
+    newShape.curveNodes.clear();
+
+    if (type == SHAPE_CURVE) {
+        CurveNode firstNode;
+        firstNode.position[0] = -0.35f;
+        firstNode.position[1] = 0.0f;
+        firstNode.position[2] = 0.0f;
+        firstNode.radius = 0.12f;
+
+        CurveNode secondNode;
+        secondNode.position[0] = 0.35f;
+        secondNode.position[1] = 0.0f;
+        secondNode.position[2] = 0.0f;
+        secondNode.radius = 0.12f;
+
+        newShape.curveNodes.push_back(firstNode);
+        newShape.curveNodes.push_back(secondNode);
+    }
 }
 
 } // namespace rmt

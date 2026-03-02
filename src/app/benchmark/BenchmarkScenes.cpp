@@ -39,6 +39,7 @@ Shape makeBaseShape(int type, const std::string& name) {
     shape.emissionStrength = 0.0f;
     shape.transmission = 0.0f;
     shape.ior = 1.5f;
+    shape.dispersion = 0.0f;
     shape.bendModifierEnabled = false;
     shape.twistModifierEnabled = false;
     shape.mirrorModifierEnabled = false;

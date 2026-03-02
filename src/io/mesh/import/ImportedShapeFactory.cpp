@@ -62,6 +62,7 @@ Shape buildDefaultMeshShape(const std::string& path, int volumeId) {
     shape.emissionStrength = 0.0f;
     shape.transmission = 0.0f;
     shape.ior = 1.5f;
+    shape.dispersion = 0.0f;
     shape.bendModifierEnabled = false;
     shape.twistModifierEnabled = false;
     shape.mirrorModifierEnabled = false;
@@ -72,6 +73,20 @@ Shape buildDefaultMeshShape(const std::string& path, int volumeId) {
     shape.mirrorOffset[1] = 0.0f;
     shape.mirrorOffset[2] = 0.0f;
     shape.mirrorSmoothness = 0.0f;
+    shape.arrayModifierEnabled = false;
+    shape.arrayAxis[0] = false;
+    shape.arrayAxis[1] = false;
+    shape.arrayAxis[2] = false;
+    shape.arraySpacing[0] = 2.0f;
+    shape.arraySpacing[1] = 2.0f;
+    shape.arraySpacing[2] = 2.0f;
+    shape.arrayRepeatCount[0] = 3;
+    shape.arrayRepeatCount[1] = 3;
+    shape.arrayRepeatCount[2] = 3;
+    shape.arraySmoothness = 0.0f;
+    shape.modifierStack[0] = SHAPE_MODIFIER_BEND;
+    shape.modifierStack[1] = SHAPE_MODIFIER_TWIST;
+    shape.modifierStack[2] = SHAPE_MODIFIER_ARRAY;
     return shape;
 }
 

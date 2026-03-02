@@ -22,27 +22,55 @@ void Renderer::renderPathTracer(const std::vector<Shape>& shapes,
                                 bool useGradientBackground,
                                 const RenderSettings& renderSettings,
                                 const TransformationState& transformState) {
+    const int qualityLevel = clampi(renderSettings.rayMarchQuality, RAYMARCH_QUALITY_ULTRA, RAYMARCH_QUALITY_LOW);
+    float internalResolutionScale = 1.0f;
+    if (renderSettings.optimizedTracingEnabled) {
+        if (qualityLevel == RAYMARCH_QUALITY_MEDIUM) {
+            internalResolutionScale = 0.75f;
+        } else if (qualityLevel == RAYMARCH_QUALITY_LOW) {
+            internalResolutionScale = 0.5f;
+        }
+    }
+    internalResolutionScale *= safePathTracerResolutionScale(renderSettings);
+    internalResolutionScale = clampf(internalResolutionScale, 0.5f, 1.0f);
+    const int trace_w = std::max(1, static_cast<int>(static_cast<float>(display_w) * internalResolutionScale));
+    const int trace_h = std::max(1, static_cast<int>(static_cast<float>(display_h) * internalResolutionScale));
+
     const std::chrono::steady_clock::time_point stageStart = std::chrono::steady_clock::now();
     ensureSceneBuffer(shapes);
     const std::chrono::steady_clock::time_point sceneUploadEnd = std::chrono::steady_clock::now();
     ensureMeshSdfBuffer();
     const std::chrono::steady_clock::time_point meshUploadEnd = std::chrono::steady_clock::now();
-    ensurePathTracerResources(display_w, display_h);
+    ensurePathTracerResources(trace_w, trace_h);
     const std::chrono::steady_clock::time_point resourceSetupEnd = std::chrono::steady_clock::now();
 
     const int pathTracerMaxBounces = safePathTracerMaxBounces(renderSettings);
+    const float guidedSamplingMix = safePathTracerGuidedSamplingMix(renderSettings);
+    const float misPower = safePathTracerMisPower(renderSettings);
+    const int russianRouletteStartBounce = safePathTracerRussianRouletteStartBounce(renderSettings);
     const bool denoiserEnabled = renderSettings.denoiserEnabled;
     const int denoiseStartSample = safeDenoiseStartSample(renderSettings);
     const int denoiseInterval = safeDenoiseInterval(renderSettings);
     const float cameraFovDegrees = safeCameraFovDegrees(renderSettings);
     const int cameraProjectionMode = safeCameraProjectionMode(renderSettings);
     const float cameraOrthoScale = computeCameraOrthoScale(cameraPos, cameraTarget, cameraFovDegrees);
+    const bool physicalCameraEnabled = usePathTracerPhysicalCamera(renderSettings);
+    const float physicalCameraFocalLengthMm = safePathTracerCameraFocalLengthMm(renderSettings);
+    const float physicalCameraSensorWidthMm = safePathTracerCameraSensorWidthMm(renderSettings);
+    const float physicalCameraSensorHeightMm = safePathTracerCameraSensorHeightMm(renderSettings);
+    const float physicalCameraLensRadius = safePathTracerCameraLensRadius(renderSettings);
+    const float physicalCameraFocusDistance = safePathTracerCameraFocusDistance(renderSettings);
+    const int physicalCameraBladeCount = safePathTracerCameraBladeCount(renderSettings);
+    const float physicalCameraBladeRotationRad = safePathTracerCameraBladeRotationRadians(renderSettings);
+    const float physicalCameraAnamorphicRatio = safePathTracerCameraAnamorphicRatio(renderSettings);
+    const float physicalCameraChromaticAberration = safePathTracerCameraChromaticAberration(renderSettings);
+    const float pathTracerExposureScale = safePathTracerExposureScale(renderSettings);
 
     const std::uint64_t currentSceneHash = computeSceneHash(shapes,
                                                             lightDir, lightColor, ambientColor,
                                                             backgroundColor, ambientIntensity, directLightIntensity,
                                                             cameraPos, cameraTarget,
-                                                            display_w, display_h,
+                                                            trace_w, trace_h,
                                                             useGradientBackground,
                                                             renderSettings,
                                                             transformState);
@@ -75,7 +103,7 @@ void Renderer::renderPathTracer(const std::vector<Shape>& shapes,
         glViewport(previousViewport[0], previousViewport[1], previousViewport[2], previousViewport[3]);
         return;
     }
-    glViewport(0, 0, display_w, display_h);
+    glViewport(0, 0, trace_w, trace_h);
 
     shader.use();
     shader.setInt("uSampleCount", pathSampleCount);
@@ -84,6 +112,10 @@ void Renderer::renderPathTracer(const std::vector<Shape>& shapes,
     shader.setInt("uMaxBounces", pathTracerMaxBounces);
     shader.setInt("uUseFixedSeed", renderSettings.pathTracerUseFixedSeed ? 1 : 0);
     shader.setInt("uFixedSeed", std::max(renderSettings.pathTracerFixedSeed, 0));
+    shader.setInt("uGuidedSamplingEnabled", renderSettings.pathTracerGuidedSamplingEnabled ? 1 : 0);
+    shader.setFloat("uGuidedSamplingMix", guidedSamplingMix);
+    shader.setFloat("uMisPower", misPower);
+    shader.setInt("uRussianRouletteStartBounce", russianRouletteStartBounce);
     shader.setInt("uRayMarchQuality", clampi(renderSettings.rayMarchQuality, RAYMARCH_QUALITY_ULTRA, RAYMARCH_QUALITY_LOW));
     shader.setInt("uDebugOutputMode", renderSettings.debugOutputMode);
     shader.setInt("uOptimizedMarchEnabled", renderSettings.optimizedTracingEnabled ? 1 : 0);
@@ -91,7 +123,7 @@ void Renderer::renderPathTracer(const std::vector<Shape>& shapes,
                          lightDir, lightColor, ambientColor,
                          backgroundColor, ambientIntensity, directLightIntensity,
                          cameraPos, cameraTarget,
-                         display_w, display_h,
+                         trace_w, trace_h,
                          useGradientBackground,
                          renderSettings,
                          transformState);
@@ -99,6 +131,7 @@ void Renderer::renderPathTracer(const std::vector<Shape>& shapes,
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, accumulationTextures[readIndex]);
     bindSceneBuffer(shader, 1);
+    bindMaterialTextures(shader, 6);
     if (hasActiveMirrorModifier) {
         shader.setInt("uAccelGridEnabled", 0);
     }
@@ -161,7 +194,7 @@ void Renderer::renderPathTracer(const std::vector<Shape>& shapes,
             if (mappedData != nullptr) {
                 try {
                     if (!oidnColorBuffer || !oidnOutputBuffer || oidnBufferByteSize != byteSize) {
-                        const oidn::Storage storageMode = denoiserUsingGPU ? oidn::Storage::Device : oidn::Storage::Host;
+                        const oidn::Storage storageMode = oidn::Storage::Device;
                         oidnColorBuffer = oidnDevice.newBuffer(byteSize, storageMode);
                         oidnOutputBuffer = oidnDevice.newBuffer(byteSize, storageMode);
                         oidnBufferByteSize = byteSize;
@@ -235,6 +268,16 @@ void Renderer::renderPathTracer(const std::vector<Shape>& shapes,
     display.setFloat("uCameraFovDegrees", cameraFovDegrees);
     display.setInt("uCameraProjectionMode", cameraProjectionMode);
     display.setFloat("uCameraOrthoScale", cameraOrthoScale);
+    display.setInt("uPhysicalCameraEnabled", physicalCameraEnabled ? 1 : 0);
+    display.setFloat("uPhysicalCameraFocalLengthMm", physicalCameraFocalLengthMm);
+    display.setVec2("uPhysicalCameraSensorSizeMm", physicalCameraSensorWidthMm, physicalCameraSensorHeightMm);
+    display.setFloat("uPhysicalCameraLensRadius", physicalCameraLensRadius);
+    display.setFloat("uPhysicalCameraFocusDistance", physicalCameraFocusDistance);
+    display.setInt("uPhysicalCameraBladeCount", physicalCameraBladeCount);
+    display.setFloat("uPhysicalCameraBladeRotationRad", physicalCameraBladeRotationRad);
+    display.setFloat("uPhysicalCameraAnamorphicRatio", physicalCameraAnamorphicRatio);
+    display.setFloat("uPhysicalCameraChromaticAberration", physicalCameraChromaticAberration);
+    display.setFloat("uPathTracerExposureScale", pathTracerExposureScale);
     uploadMirrorHelperUniforms(display, mirrorState);
 
     glActiveTexture(GL_TEXTURE0);

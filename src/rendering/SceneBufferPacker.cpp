@@ -5,9 +5,11 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <unordered_map>
 
 #include "rmt/io/mesh/MeshSdfRegistry.h"
 #include "rmt/rendering/Renderer.h"
+#include "rmt/rendering/Texture2D.h"
 #include "RendererInternal.h"
 
 namespace rmt {
@@ -20,7 +22,7 @@ void Renderer::ensureSceneBuffer(const std::vector<Shape>& shapes) {
         return;
     }
 
-    const std::vector<RuntimeShapeData> runtimeShapes = buildRuntimeShapeDataList(shapes);
+    std::vector<RuntimeShapeData> runtimeShapes = buildRuntimeShapeDataList(shapes);
 
     int shapeCount = static_cast<int>(runtimeShapes.size());
     if (shapeCount > maxSceneShapes) {
@@ -33,6 +35,63 @@ void Renderer::ensureSceneBuffer(const std::vector<Shape>& shapes) {
         }
         shapeCount = maxSceneShapes;
     }
+
+    packedCurveNodeTexels.clear();
+    curveNodeCount = 0;
+    const int maxCurveNodes = std::max(maxTextureBufferTexels, 1);
+
+    for (int i = 0; i < shapeCount; ++i) {
+        RuntimeShapeData& runtimeShape = runtimeShapes[static_cast<std::size_t>(i)];
+        if (runtimeShape.type != SHAPE_CURVE) {
+            continue;
+        }
+
+        const int curveOffset = curveNodeCount;
+        int localCount = std::max(1, std::min(runtimeShape.curveNodeCount, RuntimeShapeData::kMaxCurveNodes));
+        for (int nodeIndex = 0; nodeIndex < localCount; ++nodeIndex) {
+            if (curveNodeCount >= maxCurveNodes) {
+                break;
+            }
+            const int base = nodeIndex * 4;
+            packedCurveNodeTexels.push_back(runtimeShape.curveNodes[base + 0]);
+            packedCurveNodeTexels.push_back(runtimeShape.curveNodes[base + 1]);
+            packedCurveNodeTexels.push_back(runtimeShape.curveNodes[base + 2]);
+            packedCurveNodeTexels.push_back(std::max(runtimeShape.curveNodes[base + 3], 0.001f));
+            ++curveNodeCount;
+        }
+
+        localCount = curveNodeCount - curveOffset;
+        if (localCount <= 0) {
+            if (curveNodeCount < maxCurveNodes) {
+                packedCurveNodeTexels.push_back(0.0f);
+                packedCurveNodeTexels.push_back(0.0f);
+                packedCurveNodeTexels.push_back(0.0f);
+                packedCurveNodeTexels.push_back(0.1f);
+                localCount = 1;
+                ++curveNodeCount;
+            }
+        }
+
+        runtimeShape.param[0] = static_cast<float>(curveOffset);
+        runtimeShape.param[1] = static_cast<float>(localCount);
+        runtimeShape.param[2] = 0.0f;
+        runtimeShape.param[3] = 0.0f;
+    }
+
+    if (packedCurveNodeTexels.empty()) {
+        packedCurveNodeTexels.assign(4u, 0.0f);
+        curveNodeCount = 0;
+    }
+
+    glBindBuffer(GL_TEXTURE_BUFFER, curveNodeBufferObject);
+    glBufferData(GL_TEXTURE_BUFFER,
+                 static_cast<GLsizeiptr>(packedCurveNodeTexels.size() * sizeof(float)),
+                 packedCurveNodeTexels.data(),
+                 GL_DYNAMIC_DRAW);
+    glBindTexture(GL_TEXTURE_BUFFER, curveNodeBufferTexture);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, curveNodeBufferObject);
+    glBindTexture(GL_TEXTURE_BUFFER, 0);
+    glBindBuffer(GL_TEXTURE_BUFFER, 0);
 
     if (shapeCount > 0) {
         std::array<float, 3> boundsMin = {
@@ -76,11 +135,52 @@ void Renderer::ensureSceneBuffer(const std::vector<Shape>& shapes) {
 
     buildAccelerationGrid(runtimeShapes, shapeCount);
 
+    materialTextureCount = 0;
+    std::fill(materialTextureIds, materialTextureIds + kMaxMaterialTextures, 0);
+    materialTextureOverflowWarningIssued = false;
+    std::unordered_map<std::string, int> materialTextureSlots;
+
+    const auto resolveMaterialTextureIndex = [&](const std::string& texturePath) -> float {
+        if (texturePath.empty()) {
+            return -1.0f;
+        }
+
+        const std::unordered_map<std::string, int>::const_iterator existingSlot = materialTextureSlots.find(texturePath);
+        if (existingSlot != materialTextureSlots.end()) {
+            return static_cast<float>(existingSlot->second);
+        }
+
+        MaterialTextureInfo textureInfo;
+        if (!acquireMaterialTexture(texturePath, textureInfo) || textureInfo.textureId == 0) {
+            return -1.0f;
+        }
+
+        if (materialTextureCount >= kMaxMaterialTextures) {
+            if (!materialTextureOverflowWarningIssued) {
+                std::cerr << "Warning: Material texture limit reached (max " << kMaxMaterialTextures
+                          << "). Additional textures are ignored for this frame." << std::endl;
+                materialTextureOverflowWarningIssued = true;
+            }
+            return -1.0f;
+        }
+
+        const int slot = materialTextureCount;
+        materialTextureIds[slot] = textureInfo.textureId;
+        materialTextureSlots[texturePath] = slot;
+        ++materialTextureCount;
+        return static_cast<float>(slot);
+    };
+
     const int storageShapeCount = std::max(shapeCount, 1);
     packedSceneTexels.assign(static_cast<std::size_t>(storageShapeCount * sceneTexelStride) * 4u, 0.0f);
     for (int i = 0; i < shapeCount; ++i) {
         const RuntimeShapeData& runtimeShape = runtimeShapes[static_cast<std::size_t>(i)];
         const Shape& sourceShape = shapes[static_cast<std::size_t>(i)];
+        const float albedoTextureIndex = resolveMaterialTextureIndex(sourceShape.albedoTexturePath);
+        const float roughnessTextureIndex = resolveMaterialTextureIndex(sourceShape.roughnessTexturePath);
+        const float metallicTextureIndex = resolveMaterialTextureIndex(sourceShape.metallicTexturePath);
+        const float normalTextureIndex = resolveMaterialTextureIndex(sourceShape.normalTexturePath);
+        const float displacementTextureIndex = resolveMaterialTextureIndex(sourceShape.displacementTexturePath);
 
         writePackedTexel(packedSceneTexels, i, 0,
                          static_cast<float>(runtimeShape.type),
@@ -142,6 +242,42 @@ void Renderer::ensureSceneBuffer(const std::vector<Shape>& shapes) {
                          sourceShape.ior,
                          runtimeShape.fractalExtra[0],
                          runtimeShape.fractalExtra[1]);
+
+        writePackedTexel(packedSceneTexels, i, 14,
+                 runtimeShape.arrayAxis[0],
+                 runtimeShape.arrayAxis[1],
+                 runtimeShape.arrayAxis[2],
+                         runtimeShape.arraySmoothness);
+
+        writePackedTexel(packedSceneTexels, i, 15,
+                 runtimeShape.arraySpacing[0],
+                 runtimeShape.arraySpacing[1],
+                 runtimeShape.arraySpacing[2],
+                 0.0f);
+
+        writePackedTexel(packedSceneTexels, i, 16,
+                 runtimeShape.arrayRepeatCount[0],
+                 runtimeShape.arrayRepeatCount[1],
+                 runtimeShape.arrayRepeatCount[2],
+                 0.0f);
+
+        writePackedTexel(packedSceneTexels, i, 17,
+                 runtimeShape.modifierStack[0],
+                 runtimeShape.modifierStack[1],
+                 runtimeShape.modifierStack[2],
+                 0.0f);
+
+        writePackedTexel(packedSceneTexels, i, 18,
+                         albedoTextureIndex,
+                         roughnessTextureIndex,
+                         metallicTextureIndex,
+                         normalTextureIndex);
+
+        writePackedTexel(packedSceneTexels, i, 19,
+                         displacementTextureIndex,
+                         std::max(sourceShape.displacementStrength, 0.0f),
+                         std::max(0.0f, std::min(sourceShape.dispersion, 1.0f)),
+                         0.0f);
     }
 
     glBindBuffer(GL_TEXTURE_BUFFER, sceneBufferObject);
@@ -209,6 +345,7 @@ void Renderer::bindSceneBuffer(const Shader& activeShader, int textureUnit) cons
     const int accelCellRangeUnit = textureUnit + 1;
     const int accelShapeIndexUnit = textureUnit + 2;
     const int meshSdfUnit = textureUnit + 3;
+    const int curveNodeUnit = textureUnit + 4;
 
     activeShader.setInt("shapeCount", uploadedShapeCount);
     activeShader.setInt("uShapeTexelStride", sceneTexelStride);
@@ -225,6 +362,8 @@ void Renderer::bindSceneBuffer(const Shader& activeShader, int textureUnit) cons
     activeShader.setInt("uMeshSdfBuffer", meshSdfUnit);
     activeShader.setInt("uMeshSdfResolution", meshSdfResolution);
     activeShader.setInt("uMeshSdfCount", meshSdfCount);
+    activeShader.setInt("uCurveNodeBuffer", curveNodeUnit);
+    activeShader.setInt("uCurveNodeCount", curveNodeCount);
     activeShader.setVec3("uSceneBoundsCenter",
                          sceneBoundsCenter[0],
                          sceneBoundsCenter[1],
@@ -239,6 +378,24 @@ void Renderer::bindSceneBuffer(const Shader& activeShader, int textureUnit) cons
     glBindTexture(GL_TEXTURE_BUFFER, accelShapeIndexTexture);
     glActiveTexture(GL_TEXTURE0 + meshSdfUnit);
     glBindTexture(GL_TEXTURE_BUFFER, meshSdfBufferTexture);
+    glActiveTexture(GL_TEXTURE0 + curveNodeUnit);
+    glBindTexture(GL_TEXTURE_BUFFER, curveNodeBufferTexture);
+}
+
+void Renderer::bindMaterialTextures(const Shader& activeShader, int textureUnit) const {
+    int textureUnits[kMaxMaterialTextures];
+    for (int i = 0; i < kMaxMaterialTextures; ++i) {
+        textureUnits[i] = textureUnit + i;
+    }
+
+    activeShader.setInt("uMaterialTextureCount", materialTextureCount);
+    activeShader.setIntArray("uMaterialTextures", textureUnits, kMaxMaterialTextures);
+
+    for (int i = 0; i < kMaxMaterialTextures; ++i) {
+        glActiveTexture(GL_TEXTURE0 + textureUnit + i);
+        const GLuint textureId = (i < materialTextureCount) ? materialTextureIds[i] : 0;
+        glBindTexture(GL_TEXTURE_2D, textureId);
+    }
 }
 
 } // namespace rmt

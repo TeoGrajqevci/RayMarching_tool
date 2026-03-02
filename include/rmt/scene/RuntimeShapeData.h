@@ -5,6 +5,8 @@
 namespace rmt {
 
 struct RuntimeShapeData {
+    static constexpr int kMaxCurveNodes = 64;
+
     int type;
     int blendOp;
     int flags;
@@ -21,9 +23,16 @@ struct RuntimeShapeData {
     float mirror[3];
     float mirrorOffset[3];
     float mirrorSmoothness;
+    float arrayAxis[3];
+    float arraySpacing[3];
+    float arrayRepeatCount[3];
+    float arraySmoothness;
+    float modifierStack[3];
     float smoothness;
     float boundRadius;
     float influenceRadius;
+    int curveNodeCount;
+    float curveNodes[kMaxCurveNodes * 4];
 };
 
 } // namespace rmt

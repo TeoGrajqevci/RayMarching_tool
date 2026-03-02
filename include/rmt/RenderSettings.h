@@ -29,6 +29,24 @@ struct RenderSettings {
     int pathTracerMaxBounces = 6;
     bool pathTracerUseFixedSeed = false;
     int pathTracerFixedSeed = 1337;
+    bool pathTracerGuidedSamplingEnabled = true;
+    float pathTracerGuidedSamplingMix = 0.2f;
+    float pathTracerMisPower = 1.0f;
+    int pathTracerRussianRouletteStartBounce = 2;
+    float pathTracerResolutionScale = 1.0f;
+    bool pathTracerPhysicalCameraEnabled = false;
+    float pathTracerCameraFocalLengthMm = 50.0f;
+    float pathTracerCameraSensorWidthMm = 36.0f;
+    float pathTracerCameraSensorHeightMm = 24.0f;
+    float pathTracerCameraApertureFNumber = 8.0f;
+    float pathTracerCameraFocusDistance = 5.0f;
+    int pathTracerCameraBladeCount = 0;
+    float pathTracerCameraBladeRotationDegrees = 0.0f;
+    float pathTracerCameraAnamorphicRatio = 1.0f;
+    float pathTracerCameraChromaticAberration = 0.0f;
+    float pathTracerCameraShutterSeconds = 1.0f / 125.0f;
+    float pathTracerCameraIso = 100.0f;
+    float pathTracerCameraExposureCompensationEv = 0.0f;
 
     bool denoiserEnabled = true;
     int denoiseStartSample = 8;

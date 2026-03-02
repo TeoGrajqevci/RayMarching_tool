@@ -9,18 +9,30 @@ namespace rmt {
 
 namespace {
 
+template <typename T, std::size_t N>
+bool arrayEqual(const T (&lhs)[N], const T (&rhs)[N]) {
+    for (std::size_t i = 0; i < N; ++i) {
+        if (lhs[i] != rhs[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 } // namespace
 
 UndoRedoManager::UndoRedoManager(std::size_t maxSnapshotsIn)
     : maxSnapshots(std::max<std::size_t>(2u, maxSnapshotsIn)),
       cursor(0u),
       lastCommittedHash(0ULL),
-      initialized(false) {}
+    initialized(false),
+    interactionWasActive(false) {}
 
 void UndoRedoManager::initialize(const std::vector<Shape>& shapes, const std::vector<int>& selectedShapes) {
     snapshots.clear();
     cursor = 0u;
     initialized = true;
+    interactionWasActive = false;
 
     const std::uint64_t hash = computeStateHash(shapes, selectedShapes);
     Snapshot snapshot;
@@ -38,12 +50,24 @@ void UndoRedoManager::capture(const std::vector<Shape>& shapes, const std::vecto
         return;
     }
 
+    const std::uint64_t hash = computeStateHash(shapes, selectedShapes);
+    const bool stateChanged = snapshots.empty() ? true : !areStatesEqual(snapshots[cursor], shapes, selectedShapes);
+
     if (interactionActive) {
+        interactionWasActive = true;
         return;
     }
 
-    const std::uint64_t hash = computeStateHash(shapes, selectedShapes);
-    if (hash == lastCommittedHash) {
+    if (interactionWasActive) {
+        interactionWasActive = false;
+        if (!stateChanged) {
+            return;
+        }
+        commitSnapshot(shapes, selectedShapes, hash);
+        return;
+    }
+
+    if (!stateChanged) {
         return;
     }
 
@@ -80,6 +104,14 @@ bool UndoRedoManager::canRedo() const {
     return initialized && !snapshots.empty() && (cursor + 1u) < snapshots.size();
 }
 
+std::size_t UndoRedoManager::snapshotCount() const {
+    return snapshots.size();
+}
+
+std::size_t UndoRedoManager::currentIndex() const {
+    return cursor;
+}
+
 unsigned long long UndoRedoManager::computeStateHash(const std::vector<Shape>& shapes, const std::vector<int>& selectedShapes) {
     std::uint64_t hash = kFnv1aOffsetBasis;
 
@@ -104,10 +136,17 @@ unsigned long long UndoRedoManager::computeStateHash(const std::vector<Shape>& s
         fnv1aHashRaw(hash, shape.albedo, sizeof(shape.albedo));
         fnv1aHashValue(hash, shape.metallic);
         fnv1aHashValue(hash, shape.roughness);
+        fnv1aHashString(hash, shape.albedoTexturePath);
+        fnv1aHashString(hash, shape.roughnessTexturePath);
+        fnv1aHashString(hash, shape.metallicTexturePath);
+        fnv1aHashString(hash, shape.normalTexturePath);
+        fnv1aHashString(hash, shape.displacementTexturePath);
+        fnv1aHashValue(hash, shape.displacementStrength);
         fnv1aHashRaw(hash, shape.emission, sizeof(shape.emission));
         fnv1aHashValue(hash, shape.emissionStrength);
         fnv1aHashValue(hash, shape.transmission);
         fnv1aHashValue(hash, shape.ior);
+        fnv1aHashValue(hash, shape.dispersion);
         fnv1aHashValue(hash, shape.bendModifierEnabled);
         fnv1aHashValue(hash, shape.twistModifierEnabled);
         fnv1aHashValue(hash, shape.mirrorModifierEnabled);
@@ -123,6 +162,90 @@ unsigned long long UndoRedoManager::computeStateHash(const std::vector<Shape>& s
     }
 
     return hash;
+}
+
+bool UndoRedoManager::areShapesEqual(const Shape& lhs, const Shape& rhs) {
+    if (lhs.type != rhs.type ||
+        lhs.extra != rhs.extra ||
+        lhs.scaleMode != rhs.scaleMode ||
+        lhs.name != rhs.name ||
+        lhs.meshSourcePath != rhs.meshSourcePath ||
+        lhs.blendOp != rhs.blendOp ||
+        lhs.smoothness != rhs.smoothness ||
+        lhs.metallic != rhs.metallic ||
+        lhs.roughness != rhs.roughness ||
+        lhs.albedoTexturePath != rhs.albedoTexturePath ||
+        lhs.roughnessTexturePath != rhs.roughnessTexturePath ||
+        lhs.metallicTexturePath != rhs.metallicTexturePath ||
+        lhs.normalTexturePath != rhs.normalTexturePath ||
+        lhs.displacementTexturePath != rhs.displacementTexturePath ||
+        lhs.displacementStrength != rhs.displacementStrength ||
+        lhs.emissionStrength != rhs.emissionStrength ||
+        lhs.transmission != rhs.transmission ||
+        lhs.ior != rhs.ior ||
+        lhs.dispersion != rhs.dispersion ||
+        lhs.bendModifierEnabled != rhs.bendModifierEnabled ||
+        lhs.twistModifierEnabled != rhs.twistModifierEnabled ||
+        lhs.mirrorModifierEnabled != rhs.mirrorModifierEnabled ||
+        lhs.mirrorSmoothness != rhs.mirrorSmoothness ||
+        lhs.arrayModifierEnabled != rhs.arrayModifierEnabled ||
+        lhs.arraySmoothness != rhs.arraySmoothness) {
+        return false;
+    }
+
+    if (!arrayEqual(lhs.center, rhs.center) ||
+        !arrayEqual(lhs.param, rhs.param) ||
+        !arrayEqual(lhs.fractalExtra, rhs.fractalExtra) ||
+        !arrayEqual(lhs.rotation, rhs.rotation) ||
+        !arrayEqual(lhs.scale, rhs.scale) ||
+        !arrayEqual(lhs.elongation, rhs.elongation) ||
+        !arrayEqual(lhs.twist, rhs.twist) ||
+        !arrayEqual(lhs.bend, rhs.bend) ||
+        !arrayEqual(lhs.albedo, rhs.albedo) ||
+        !arrayEqual(lhs.emission, rhs.emission) ||
+        !arrayEqual(lhs.mirrorAxis, rhs.mirrorAxis) ||
+        !arrayEqual(lhs.mirrorOffset, rhs.mirrorOffset) ||
+        !arrayEqual(lhs.arrayAxis, rhs.arrayAxis) ||
+        !arrayEqual(lhs.arraySpacing, rhs.arraySpacing) ||
+        !arrayEqual(lhs.arrayRepeatCount, rhs.arrayRepeatCount) ||
+        !arrayEqual(lhs.modifierStack, rhs.modifierStack)) {
+        return false;
+    }
+
+    if (lhs.curveNodes.size() != rhs.curveNodes.size()) {
+        return false;
+    }
+    for (std::size_t i = 0; i < lhs.curveNodes.size(); ++i) {
+        if (!arrayEqual(lhs.curveNodes[i].position, rhs.curveNodes[i].position) ||
+            lhs.curveNodes[i].radius != rhs.curveNodes[i].radius) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool UndoRedoManager::areStatesEqual(const Snapshot& snapshot,
+                                     const std::vector<Shape>& shapes,
+                                     const std::vector<int>& selectedShapes) {
+    if (snapshot.shapes.size() != shapes.size() ||
+        snapshot.selectedShapes.size() != selectedShapes.size()) {
+        return false;
+    }
+
+    for (std::size_t i = 0; i < shapes.size(); ++i) {
+        if (!areShapesEqual(snapshot.shapes[i], shapes[i])) {
+            return false;
+        }
+    }
+
+    for (std::size_t i = 0; i < selectedShapes.size(); ++i) {
+        if (snapshot.selectedShapes[i] != selectedShapes[i]) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 void UndoRedoManager::sanitizeSelection(std::vector<int>& selectedShapes, std::size_t shapeCount) {

@@ -19,6 +19,7 @@
 #include "rmt/platform/glfw/FileDropQueue.h"
 #include "rmt/platform/imgui/ImGuiLayer.h"
 #include "rmt/ui/UiFacade.h"
+#include "rmt/ui/console/Console.h"
 
 namespace rmt {
 
@@ -79,6 +80,24 @@ void resetTransformInteractionState(TransformationState& ts) {
     ts.pointLightMoveModeActive = false;
     ts.pointLightMoveConstrained = false;
     ts.pointLightMoveAxis = -1;
+        ts.curveNodeSelected = false;
+        ts.curveNodeShapeIndex = -1;
+        ts.curveNodeIndex = -1;
+        ts.curveEditMode = false;
+        ts.curveNodeMoveModeActive = false;
+        ts.curveNodeMoveConstrained = false;
+        ts.curveNodeMoveAxis = -1;
+        ts.curveNodeMoveKeyHandled = false;
+        ts.curveNodeMoveStartMouseX = 0.0;
+        ts.curveNodeMoveStartMouseY = 0.0;
+        ts.curveNodeMoveStartPosition[0] = 0.0f;
+        ts.curveNodeMoveStartPosition[1] = 0.0f;
+        ts.curveNodeMoveStartPosition[2] = 0.0f;
+        ts.curveNodeScaleModeActive = false;
+        ts.curveNodeScaleKeyHandled = false;
+        ts.curveNodeScaleStartMouseX = 0.0;
+        ts.curveNodeScaleStartMouseY = 0.0;
+        ts.curveNodeScaleStartRadius = 0.1f;
 }
 
 bool isInsideViewport(double x, double y, const ImVec2& viewportPos, const ImVec2& viewportSize) {
@@ -128,8 +147,6 @@ int runEditorRuntimeLoop(GLFWwindow* window,
         pointLight.color[2] = 1.0f;
     }
     undoRedoManager.initialize(shapes, selectedShapes);
-    bool undoShortcutHandled = false;
-    bool redoShortcutHandled = false;
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -177,6 +194,9 @@ int runEditorRuntimeLoop(GLFWwindow* window,
                                                   viewportSize);
         updateOrbitCameraPosition(camDistance, camTheta, camPhi, cameraTarget, cameraPos);
 
+        const std::vector<rmt::DroppedFileEvent> droppedFiles = rmt::consumeDroppedFileEvents();
+        std::vector<char> consumedDropFlags(droppedFiles.size(), 0);
+
         ImVec2 helpButtonPos;
         if (runtimeState.showGui) {
             guiManager.newFrame();
@@ -201,10 +221,14 @@ int runEditorRuntimeLoop(GLFWwindow* window,
                                  transformState,
                                  cameraPos,
                                  cameraTarget,
+                                 camTheta,
+                                 camPhi,
                                  renderSettings,
                                  renderer.isDenoiserAvailable(),
                                  renderer.isDenoiserUsingGPU(),
-                                 renderer.getPathSampleCount());
+                                 renderer.getPathSampleCount(),
+                                 droppedFiles,
+                                 consumedDropFlags);
         }
 
         if (runtimeState.showGui) {
@@ -212,9 +236,12 @@ int runEditorRuntimeLoop(GLFWwindow* window,
             viewportSize = guiManager.getViewportSize();
         }
 
-        const std::vector<rmt::DroppedFileEvent> droppedFiles = rmt::consumeDroppedFileEvents();
         if (!droppedFiles.empty()) {
             for (std::size_t dropIndex = 0; dropIndex < droppedFiles.size(); ++dropIndex) {
+                if (dropIndex < consumedDropFlags.size() && consumedDropFlags[dropIndex] != 0) {
+                    continue;
+                }
+
                 const rmt::DroppedFileEvent& dropped = droppedFiles[dropIndex];
                 if (dropped.path.empty()) {
                     continue;
@@ -266,20 +293,28 @@ int runEditorRuntimeLoop(GLFWwindow* window,
                                                       mouseWasPressed,
                                                       transformState,
                                                       lightDir,
+                                                      renderSettings,
                                                       viewportPos,
                                                       viewportSize);
         updateOrbitCameraPosition(camDistance, camTheta, camPhi, cameraTarget, cameraPos);
 
-        const bool leftCtrlDown = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
-        const bool rightCtrlDown = glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS;
-        const bool ctrlDown = leftCtrlDown || rightCtrlDown;
-        const bool shiftDown = (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) ||
-                               (glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS);
-        const bool zDown = glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS;
-        const bool yDown = glfwGetKey(window, GLFW_KEY_Y) == GLFW_PRESS;
-        const bool redoChordDown = yDown || (shiftDown && zDown);
-        const bool undoChordDown = zDown && !shiftDown;
-        const bool keyboardCapturedByUI = runtimeState.showGui && ImGui::GetIO().WantCaptureKeyboard;
+        const ImGuiInputFlags shortcutRoute = ImGuiInputFlags_RouteGlobal;
+#if defined(__APPLE__)
+        const bool undoShortcutPressed =
+            ImGui::Shortcut(ImGuiMod_Super | ImGuiKey_Z, shortcutRoute) ||
+            ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z, shortcutRoute);
+        const bool redoShortcutPressed =
+            ImGui::Shortcut(ImGuiMod_Super | ImGuiMod_Shift | ImGuiKey_Z, shortcutRoute) ||
+            ImGui::Shortcut(ImGuiMod_Super | ImGuiKey_Y, shortcutRoute) ||
+            ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z, shortcutRoute) ||
+            ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y, shortcutRoute);
+#else
+        const bool undoShortcutPressed = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z, shortcutRoute);
+        const bool redoShortcutPressed =
+            ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z, shortcutRoute) ||
+            ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y, shortcutRoute);
+#endif
+        const bool keyboardCapturedByUI = runtimeState.showGui && ImGui::GetIO().WantTextInput;
         const bool transformInteractionActive = transformState.translationModeActive ||
                                                transformState.rotationModeActive ||
                                                transformState.scaleModeActive ||
@@ -287,25 +322,18 @@ int runEditorRuntimeLoop(GLFWwindow* window,
                                                transformState.sunLightMoveModeActive ||
                                                transformState.sunLightHandleDragActive ||
                                                transformState.pointLightMoveModeActive;
-        const bool shortcutsAllowed = !keyboardCapturedByUI && !transformInteractionActive;
+        const bool shortcutsAllowed = !keyboardCapturedByUI;
 
-        if (shortcutsAllowed && ctrlDown && undoChordDown && !undoShortcutHandled) {
+        if (shortcutsAllowed && undoShortcutPressed) {
+            undoRedoManager.capture(shapes, selectedShapes, false);
             if (undoRedoManager.undo(shapes, selectedShapes)) {
                 resetTransformInteractionState(transformState);
             }
-            undoShortcutHandled = true;
         }
-        if (shortcutsAllowed && ctrlDown && redoChordDown && !redoShortcutHandled) {
+        if (shortcutsAllowed && redoShortcutPressed) {
             if (undoRedoManager.redo(shapes, selectedShapes)) {
                 resetTransformInteractionState(transformState);
             }
-            redoShortcutHandled = true;
-        }
-        if (!(ctrlDown && undoChordDown)) {
-            undoShortcutHandled = false;
-        }
-        if (!(ctrlDown && redoChordDown)) {
-            redoShortcutHandled = false;
         }
 
         const bool uiInteractionActive = runtimeState.showGui && (ImGui::IsAnyItemActive() || ImGuizmo::IsUsing());

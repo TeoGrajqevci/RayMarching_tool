@@ -1,4 +1,3 @@
-
 out vec4 FragColor;
 in vec2 fragCoord;
 
@@ -10,6 +9,10 @@ uniform int uSampleCount;
 uniform int uFrameIndex;
 uniform int uUseFixedSeed;
 uniform int uFixedSeed;
+uniform int uGuidedSamplingEnabled;
+uniform float uGuidedSamplingMix;
+uniform float uMisPower;
+uniform int uRussianRouletteStartBounce;
 
 uniform samplerBuffer uShapeBuffer;
 uniform int uShapeTexelStride;
@@ -23,6 +26,11 @@ uniform vec3 uAccelGridInvCellSize;
 uniform samplerBuffer uMeshSdfBuffer;
 uniform int uMeshSdfResolution;
 uniform int uMeshSdfCount;
+uniform samplerBuffer uCurveNodeBuffer;
+uniform int uCurveNodeCount;
+const int MAX_MATERIAL_TEXTURES = 8;
+uniform int uMaterialTextureCount;
+uniform sampler2D uMaterialTextures[MAX_MATERIAL_TEXTURES];
 
 uniform vec3 lightDir;
 uniform vec3 lightColor;
@@ -43,6 +51,14 @@ uniform vec3 cameraTarget;
 uniform float uCameraFovDegrees;
 uniform int uCameraProjectionMode;
 uniform float uCameraOrthoScale;
+uniform int uPhysicalCameraEnabled;
+uniform float uPhysicalCameraFocalLengthMm;
+uniform vec2 uPhysicalCameraSensorSizeMm;
+uniform float uPhysicalCameraLensRadius;
+uniform float uPhysicalCameraFocusDistance;
+uniform int uPhysicalCameraBladeCount;
+uniform float uPhysicalCameraBladeRotationRad;
+uniform float uPhysicalCameraAnamorphicRatio;
 uniform int uMaxBounces;
 uniform int uRayMarchQuality;
 uniform int uOptimizedMarchEnabled;
@@ -57,6 +73,11 @@ const int FLAG_HAS_ROUNDING = 1 << 3;
 const int FLAG_HAS_TWIST = 1 << 4;
 const int FLAG_HAS_BEND = 1 << 5;
 const int FLAG_HAS_MIRROR = 1 << 7;
+const int FLAG_HAS_ARRAY = 1 << 8;
+
+const int SHAPE_MODIFIER_BEND = 0;
+const int SHAPE_MODIFIER_TWIST = 1;
+const int SHAPE_MODIFIER_ARRAY = 2;
 
 const int BLEND_NONE = 0;
 const int BLEND_SMOOTH_UNION = 1;
@@ -86,6 +107,11 @@ struct Material {
     float emissionStrength;
     float transmission;
     float ior;
+    float dispersion;
+    float albedoTexIndex;
+    float roughnessTexIndex;
+    float metallicTexIndex;
+    float normalTexIndex;
 };
 
 struct SDFResult {
@@ -118,6 +144,11 @@ struct ShapeData {
     vec3 mirrorAxis;
     vec3 mirrorOffset;
     float mirrorSmoothness;
+    vec3 arrayAxis;
+    vec3 arraySpacing;
+    vec3 arrayRepeatCount;
+    float arraySmoothness;
+    vec3 modifierStack;
     float smoothness;
     vec3 albedo;
     float metallic;
@@ -126,6 +157,13 @@ struct ShapeData {
     float emissionStrength;
     float transmission;
     float ior;
+    float dispersion;
+    float albedoTexIndex;
+    float roughnessTexIndex;
+    float metallicTexIndex;
+    float normalTexIndex;
+    float displacementTexIndex;
+    float displacementStrength;
 };
 
 vec4 fetchShapeTexel(int shapeIndex, int slot) {
@@ -138,6 +176,129 @@ vec4 fetchAccelCellRangeTexel(int cellIndex) {
 
 int fetchAccelShapeIndex(int accelIndex) {
     return int(texelFetch(uAccelShapeIndices, accelIndex).x + 0.5);
+}
+
+bool hasMaterialTexture(float textureIndex) {
+    int idx = int(floor(textureIndex + 0.5));
+    return idx >= 0 && idx < uMaterialTextureCount && idx < MAX_MATERIAL_TEXTURES;
+}
+
+vec4 sampleMaterialTextureByIndex(int textureIndex, vec2 uv) {
+    if(textureIndex == 0) {
+        return texture(uMaterialTextures[0], uv);
+    } else if(textureIndex == 1) {
+        return texture(uMaterialTextures[1], uv);
+    } else if(textureIndex == 2) {
+        return texture(uMaterialTextures[2], uv);
+    } else if(textureIndex == 3) {
+        return texture(uMaterialTextures[3], uv);
+    } else if(textureIndex == 4) {
+        return texture(uMaterialTextures[4], uv);
+    } else if(textureIndex == 5) {
+        return texture(uMaterialTextures[5], uv);
+    } else if(textureIndex == 6) {
+        return texture(uMaterialTextures[6], uv);
+    } else if(textureIndex == 7) {
+        return texture(uMaterialTextures[7], uv);
+    }
+    return vec4(1.0);
+}
+
+vec3 triplanarBlendWeights(vec3 worldNormal) {
+    vec3 n = abs(worldNormal);
+    n = max(n, vec3(1e-5));
+    return n / max(n.x + n.y + n.z, 1e-5);
+}
+
+vec4 sampleMaterialTextureTriplanar(int textureIndex, vec3 worldPos, vec3 worldNormal) {
+    vec3 normal = worldNormal;
+    float normalLen = length(normal);
+    if(normalLen < 1e-5) {
+        normal = vec3(0.0, 1.0, 0.0);
+    } else {
+        normal /= normalLen;
+    }
+
+    vec3 blend = triplanarBlendWeights(normal);
+    vec4 sampleX = sampleMaterialTextureByIndex(textureIndex, worldPos.yz);
+    vec4 sampleY = sampleMaterialTextureByIndex(textureIndex, worldPos.xz);
+    vec4 sampleZ = sampleMaterialTextureByIndex(textureIndex, worldPos.xy);
+    return sampleX * blend.x + sampleY * blend.y + sampleZ * blend.z;
+}
+
+vec3 sampleAlbedoTexture(vec3 baseAlbedo, float textureIndex, vec3 worldPos, vec3 worldNormal) {
+    if(!hasMaterialTexture(textureIndex)) {
+        return baseAlbedo;
+    }
+    int idx = int(floor(textureIndex + 0.5));
+    vec3 texel = sampleMaterialTextureTriplanar(idx, worldPos, worldNormal).rgb;
+    vec3 linearTexel = pow(max(texel, vec3(0.0)), vec3(2.2));
+    return baseAlbedo * linearTexel;
+}
+
+float sampleRoughnessTexture(float baseRoughness, float textureIndex, vec3 worldPos, vec3 worldNormal) {
+    if(!hasMaterialTexture(textureIndex)) {
+        return baseRoughness;
+    }
+    int idx = int(floor(textureIndex + 0.5));
+    float texel = sampleMaterialTextureTriplanar(idx, worldPos, worldNormal).r;
+    return baseRoughness * clamp(texel, 0.0, 1.0);
+}
+
+float sampleMetallicTexture(float baseMetallic, float textureIndex, vec3 worldPos, vec3 worldNormal) {
+    if(!hasMaterialTexture(textureIndex)) {
+        return baseMetallic;
+    }
+    int idx = int(floor(textureIndex + 0.5));
+    float texel = sampleMaterialTextureTriplanar(idx, worldPos, worldNormal).r;
+    return clamp(baseMetallic * clamp(texel, 0.0, 1.0), 0.0, 1.0);
+}
+
+float sampleDisplacementTexture(float textureIndex, float strength, vec3 worldPos, vec3 worldNormal) {
+    if(strength <= 1e-6 || !hasMaterialTexture(textureIndex)) {
+        return 0.0;
+    }
+    int idx = int(floor(textureIndex + 0.5));
+    float texel = sampleMaterialTextureTriplanar(idx, worldPos, worldNormal).r;
+    return clamp(texel, 0.0, 1.0) * max(strength, 0.0);
+}
+
+vec3 safeNormalize(vec3 v, vec3 fallback) {
+    float lenSq = dot(v, v);
+    if(lenSq <= 1e-8) {
+        return fallback;
+    }
+    return v * inversesqrt(lenSq);
+}
+
+vec3 sampleNormalTexture(vec3 baseNormal, float textureIndex, vec3 worldPos) {
+    vec3 n = safeNormalize(baseNormal, vec3(0.0, 1.0, 0.0));
+    if(!hasMaterialTexture(textureIndex)) {
+        return n;
+    }
+
+    int idx = int(floor(textureIndex + 0.5));
+    vec3 blend = triplanarBlendWeights(n);
+    vec3 axisSign = vec3(
+        n.x < 0.0 ? -1.0 : 1.0,
+        n.y < 0.0 ? -1.0 : 1.0,
+        n.z < 0.0 ? -1.0 : 1.0
+    );
+
+    vec3 mapX = sampleMaterialTextureByIndex(idx, worldPos.yz).xyz * 2.0 - 1.0;
+    vec3 mapY = sampleMaterialTextureByIndex(idx, worldPos.xz).xyz * 2.0 - 1.0;
+    vec3 mapZ = sampleMaterialTextureByIndex(idx, worldPos.xy).xyz * 2.0 - 1.0;
+
+    vec3 worldX = safeNormalize(vec3(mapX.z * axisSign.x, mapX.x, mapX.y * axisSign.x), vec3(axisSign.x, 0.0, 0.0));
+    vec3 worldY = safeNormalize(vec3(mapY.x, mapY.z * axisSign.y, -mapY.y * axisSign.y), vec3(0.0, axisSign.y, 0.0));
+    vec3 worldZ = safeNormalize(vec3(mapZ.x, mapZ.y * axisSign.z, mapZ.z * axisSign.z), vec3(0.0, 0.0, axisSign.z));
+
+    vec3 blended = worldX * blend.x + worldY * blend.y + worldZ * blend.z;
+    vec3 mapped = safeNormalize(blended, n);
+    if(dot(mapped, n) < 0.0) {
+        mapped = -mapped;
+    }
+    return mapped;
 }
 
 bool getAccelCellRange(vec3 p, out int start, out int count, out bool forceFullScan) {
@@ -243,7 +404,7 @@ float sceneSDFDistanceExactForAccelRange(vec3 p, int accelStart, int accelCount)
 }
 
 float sceneSDFDistanceExact(vec3 p);
-SDFResult sceneSDFFull(vec3 p);
+SDFResult sceneSDFFull(vec3 p, vec3 shadingNormal);
 
 int getQualityLevel() {
     return clamp(uRayMarchQuality, RAYMARCH_QUALITY_ULTRA, RAYMARCH_QUALITY_LOW);
@@ -374,6 +535,17 @@ ShapeData loadShapeCoreDataFromHeader(int shapeIndex, vec4 t0, vec4 t1) {
     shape.mirrorAxis = vec3(0.0);
     shape.mirrorOffset = vec3(0.0);
     shape.mirrorSmoothness = 0.0;
+    shape.arrayAxis = vec3(0.0);
+    shape.arraySpacing = vec3(0.0);
+    shape.arrayRepeatCount = vec3(1.0);
+    shape.arraySmoothness = 0.0;
+    shape.modifierStack = vec3(float(SHAPE_MODIFIER_BEND), float(SHAPE_MODIFIER_TWIST), float(SHAPE_MODIFIER_ARRAY));
+    shape.albedoTexIndex = -1.0;
+    shape.roughnessTexIndex = -1.0;
+    shape.metallicTexIndex = -1.0;
+    shape.normalTexIndex = -1.0;
+    shape.displacementTexIndex = -1.0;
+    shape.displacementStrength = 0.0;
 
     if(hasFlag(shape.flags, FLAG_HAS_ROTATION)) {
         vec4 t3 = fetchShapeTexel(shapeIndex, 3);
@@ -417,6 +589,19 @@ ShapeData loadShapeCoreDataFromHeader(int shapeIndex, vec4 t0, vec4 t1) {
         shape.mirrorSmoothness = max(t9.w, 0.0);
     }
 
+    if(hasFlag(shape.flags, FLAG_HAS_ARRAY)) {
+        vec4 t14 = fetchShapeTexel(shapeIndex, 14);
+        vec4 t15 = fetchShapeTexel(shapeIndex, 15);
+        vec4 t16 = fetchShapeTexel(shapeIndex, 16);
+        shape.arrayAxis = clamp(t14.xyz, vec3(0.0), vec3(1.0));
+        shape.arraySpacing = max(abs(t15.xyz), vec3(1e-4));
+        shape.arrayRepeatCount = max(floor(t16.xyz + vec3(0.5)), vec3(1.0));
+        shape.arraySmoothness = max(t14.w, 0.0);
+    }
+
+    vec4 t17 = fetchShapeTexel(shapeIndex, 17);
+    shape.modifierStack = floor(t17.xyz + vec3(0.5));
+
     vec4 t13 = fetchShapeTexel(shapeIndex, 13);
     shape.fractalExtra = t13.zw;
 
@@ -429,6 +614,8 @@ ShapeData loadShapeDataFromHeader(int shapeIndex, vec4 t0, vec4 t1) {
     vec4 t11 = fetchShapeTexel(shapeIndex, 11);
     vec4 t12 = fetchShapeTexel(shapeIndex, 12);
     vec4 t13 = fetchShapeTexel(shapeIndex, 13);
+    vec4 t18 = fetchShapeTexel(shapeIndex, 18);
+    vec4 t19 = fetchShapeTexel(shapeIndex, 19);
 
     shape.albedo = t10.xyz;
     shape.metallic = t10.w;
@@ -437,12 +624,20 @@ ShapeData loadShapeDataFromHeader(int shapeIndex, vec4 t0, vec4 t1) {
     shape.emissionStrength = max(t12.w, 0.0);
     shape.transmission = clamp(t13.x, 0.0, 1.0);
     shape.ior = max(t13.y, 1.0);
+    shape.dispersion = max(t19.z, 0.0);
+    shape.albedoTexIndex = t18.x;
+    shape.roughnessTexIndex = t18.y;
+    shape.metallicTexIndex = t18.z;
+    shape.normalTexIndex = t18.w;
+    shape.displacementTexIndex = t19.x;
+    shape.displacementStrength = max(t19.y, 0.0);
 
     return shape;
 }
 
 ShapeData loadShapeDistanceDataFromHeader(int shapeIndex, vec4 t0, vec4 t1) {
     ShapeData shape = loadShapeCoreDataFromHeader(shapeIndex, t0, t1);
+    vec4 t19 = fetchShapeTexel(shapeIndex, 19);
     shape.albedo = vec3(0.0);
     shape.metallic = 0.0;
     shape.roughness = 1.0;
@@ -450,6 +645,12 @@ ShapeData loadShapeDistanceDataFromHeader(int shapeIndex, vec4 t0, vec4 t1) {
     shape.emissionStrength = 0.0;
     shape.transmission = 0.0;
     shape.ior = 1.5;
+    shape.dispersion = 0.0;
+    shape.albedoTexIndex = -1.0;
+    shape.roughnessTexIndex = -1.0;
+    shape.metallicTexIndex = -1.0;
+    shape.normalTexIndex = -1.0;
+    shape.displacementTexIndex = t19.x;
+    shape.displacementStrength = max(t19.y, 0.0);
     return shape;
 }
-

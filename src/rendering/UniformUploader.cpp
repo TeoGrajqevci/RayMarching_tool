@@ -31,6 +31,16 @@ void Renderer::uploadCommonUniforms(const Shader& activeShader,
     const float cameraFovDegrees = safeCameraFovDegrees(renderSettings);
     const int cameraProjectionMode = safeCameraProjectionMode(renderSettings);
     const float cameraOrthoScale = computeCameraOrthoScale(cameraPos, cameraTarget, cameraFovDegrees);
+    const bool physicalCameraEnabled = usePathTracerPhysicalCamera(renderSettings);
+    const float physicalCameraFocalLengthMm = safePathTracerCameraFocalLengthMm(renderSettings);
+    const float physicalCameraSensorWidthMm = safePathTracerCameraSensorWidthMm(renderSettings);
+    const float physicalCameraSensorHeightMm = safePathTracerCameraSensorHeightMm(renderSettings);
+    const float physicalCameraLensRadius = safePathTracerCameraLensRadius(renderSettings);
+    const float physicalCameraFocusDistance = safePathTracerCameraFocusDistance(renderSettings);
+    const int physicalCameraBladeCount = safePathTracerCameraBladeCount(renderSettings);
+    const float physicalCameraBladeRotationRad = safePathTracerCameraBladeRotationRadians(renderSettings);
+    const float physicalCameraAnamorphicRatio = safePathTracerCameraAnamorphicRatio(renderSettings);
+    const float pathTracerExposureScale = safePathTracerExposureScale(renderSettings);
 
     activeShader.setVec2("iResolution", static_cast<float>(display_w), static_cast<float>(display_h));
     activeShader.setFloat("iTime", static_cast<float>(glfwGetTime()));
@@ -45,6 +55,15 @@ void Renderer::uploadCommonUniforms(const Shader& activeShader,
     activeShader.setFloat("uCameraFovDegrees", cameraFovDegrees);
     activeShader.setInt("uCameraProjectionMode", cameraProjectionMode);
     activeShader.setFloat("uCameraOrthoScale", cameraOrthoScale);
+    activeShader.setInt("uPhysicalCameraEnabled", physicalCameraEnabled ? 1 : 0);
+    activeShader.setFloat("uPhysicalCameraFocalLengthMm", physicalCameraFocalLengthMm);
+    activeShader.setVec2("uPhysicalCameraSensorSizeMm", physicalCameraSensorWidthMm, physicalCameraSensorHeightMm);
+    activeShader.setFloat("uPhysicalCameraLensRadius", physicalCameraLensRadius);
+    activeShader.setFloat("uPhysicalCameraFocusDistance", physicalCameraFocusDistance);
+    activeShader.setInt("uPhysicalCameraBladeCount", physicalCameraBladeCount);
+    activeShader.setFloat("uPhysicalCameraBladeRotationRad", physicalCameraBladeRotationRad);
+    activeShader.setFloat("uPhysicalCameraAnamorphicRatio", physicalCameraAnamorphicRatio);
+    activeShader.setFloat("uPathTracerExposureScale", pathTracerExposureScale);
     activeShader.setInt("uBackgroundGradient", useGradientBackground ? 1 : 0);
 
     const int pointLightCount = std::min(static_cast<int>(transformState.pointLights.size()), kMaxPointLights);

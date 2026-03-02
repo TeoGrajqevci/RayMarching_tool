@@ -61,7 +61,7 @@ void Renderer::ensurePathTracerResources(int display_w, int display_h) {
 
 #ifdef RMT_HAS_OIDN
     if (denoiserAvailable) {
-        const oidn::Storage storageMode = denoiserUsingGPU ? oidn::Storage::Device : oidn::Storage::Host;
+        const oidn::Storage storageMode = oidn::Storage::Device;
 
         oidnColorBuffer = oidnDevice.newBuffer(readbackByteSize, storageMode);
         oidnOutputBuffer = oidnDevice.newBuffer(readbackByteSize, storageMode);

@@ -84,6 +84,7 @@ private:
     void ensureMeshSdfBuffer();
     void buildAccelerationGrid(const std::vector<RuntimeShapeData>& runtimeShapes, int shapeCount);
     void bindSceneBuffer(const Shader& activeShader, int textureUnit) const;
+    void bindMaterialTextures(const Shader& activeShader, int textureUnit) const;
     void renderSolid(const std::vector<Shape>& shapes, const std::vector<int>& selectedShapes,
                      const float lightDir[3], const float lightColor[3], const float ambientColor[3],
                      const float backgroundColor[3],
@@ -132,13 +133,20 @@ private:
     GLuint accelShapeIndexTexture;
     GLuint meshSdfBufferObject;
     GLuint meshSdfBufferTexture;
+    GLuint curveNodeBufferObject;
+    GLuint curveNodeBufferTexture;
+    int materialTextureCount;
+    GLuint materialTextureIds[8];
+    bool materialTextureOverflowWarningIssued;
     std::vector<float> packedSceneTexels;
     std::vector<float> packedMeshSdfTexels;
+    std::vector<float> packedCurveNodeTexels;
     std::vector<float> accelCellRangeTexels;
     std::vector<float> accelShapeIndexTexels;
     int sceneTexelStride;
     int meshSdfResolution;
     int meshSdfCount;
+    int curveNodeCount;
     int maxTextureBufferTexels;
     int maxSceneShapes;
     int uploadedShapeCount;

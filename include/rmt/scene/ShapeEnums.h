@@ -10,7 +10,8 @@ enum ShapeType {
     SHAPE_CONE = 4,
     SHAPE_MANDELBULB = 5,
     SHAPE_MENGER_SPONGE = 6,
-    SHAPE_MESH_SDF = 7
+    SHAPE_MESH_SDF = 7,
+    SHAPE_CURVE = 8
 };
 
 enum BlendMode {
@@ -33,7 +34,14 @@ enum RuntimeShapeFlags {
     RUNTIME_SHAPE_HAS_TWIST = 1 << 4,
     RUNTIME_SHAPE_HAS_BEND = 1 << 5,
     RUNTIME_SHAPE_SCALE_MODE_ELONGATE = 1 << 6,
-    RUNTIME_SHAPE_HAS_MIRROR = 1 << 7
+    RUNTIME_SHAPE_HAS_MIRROR = 1 << 7,
+    RUNTIME_SHAPE_HAS_ARRAY = 1 << 8
+};
+
+enum ShapeModifierStackId {
+    SHAPE_MODIFIER_BEND = 0,
+    SHAPE_MODIFIER_TWIST = 1,
+    SHAPE_MODIFIER_ARRAY = 2
 };
 
 } // namespace rmt

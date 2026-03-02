@@ -40,6 +40,7 @@ void renderScenePanel(const UiWorkspaceGeometry& geometry,
             case SHAPE_MANDELBULB: iconColor = ImVec4(0.95f, 0.55f, 0.2f, 1.0f); break;
             case SHAPE_MENGER_SPONGE: iconColor = ImVec4(0.65f, 0.85f, 1.0f, 1.0f); break;
             case SHAPE_MESH_SDF: iconColor = ImVec4(0.9f, 0.75f, 0.25f, 1.0f); break;
+            case SHAPE_CURVE: iconColor = ImVec4(1.0f, 0.55f, 0.85f, 1.0f); break;
             default: iconColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); break;
         }
 
@@ -71,6 +72,7 @@ void renderScenePanel(const UiWorkspaceGeometry& geometry,
             case SHAPE_MANDELBULB: shapeTypeName = "Mandelbulb "; break;
             case SHAPE_MENGER_SPONGE: shapeTypeName = "Menger Sponge "; break;
             case SHAPE_MESH_SDF: shapeTypeName = "Mesh SDF "; break;
+            case SHAPE_CURVE: shapeTypeName = "Curve "; break;
             default: shapeTypeName = "Unknown "; break;
         }
 
@@ -147,6 +149,15 @@ void renderScenePanel(const UiWorkspaceGeometry& geometry,
             transformState.pointLightMoveModeActive = false;
             transformState.pointLightMoveConstrained = false;
             transformState.pointLightMoveAxis = -1;
+            if (selectedShapes.size() != 1 ||
+                selectedShapes[0] < 0 ||
+                selectedShapes[0] >= static_cast<int>(shapes.size()) ||
+                shapes[static_cast<std::size_t>(selectedShapes[0])].type != SHAPE_CURVE) {
+                transformState.curveEditMode = false;
+                transformState.curveNodeSelected = false;
+                transformState.curveNodeShapeIndex = -1;
+                transformState.curveNodeIndex = -1;
+            }
         }
     }
 

@@ -32,16 +32,14 @@ void updateWorkspaceLayout(GLFWwindow* window,
     geometry.contentBottom = static_cast<float>(geometry.winHeight) - geometry.pad - geometry.bottomPaneHeight;
     geometry.contentHeight = std::max(120.0f, geometry.contentBottom - geometry.contentTop);
 
-    const float minLeftPaneWidth = 220.0f;
+    const float minLeftPaneWidth = 0.0f;
     const float minRightPaneWidth = 210.0f;
     const float minSectionHeight = 80.0f;
     const float minCenterWidth = std::max(
         120.0f,
         std::min(320.0f, static_cast<float>(geometry.winWidth) - 4.0f * geometry.pad - minLeftPaneWidth - minRightPaneWidth));
 
-    if (uiState.leftPaneWidthState < 0.0f) {
-        uiState.leftPaneWidthState = defaultLeftPaneWidth;
-    }
+    uiState.leftPaneWidthState = 0.0f;
     if (uiState.rightPaneWidthState < 0.0f) {
         uiState.rightPaneWidthState = defaultRightPaneWidth;
     }
@@ -53,17 +51,14 @@ void updateWorkspaceLayout(GLFWwindow* window,
     }
 
     auto clampColumnWidths = [&]() {
-        const float maxLeft = std::max(minLeftPaneWidth, static_cast<float>(geometry.winWidth) -
-                                                         4.0f * geometry.pad - uiState.rightPaneWidthState - minCenterWidth);
+        const float maxLeft = 0.0f;
         uiState.leftPaneWidthState = clampUiFloat(uiState.leftPaneWidthState, minLeftPaneWidth, maxLeft);
 
         const float maxRight = std::max(minRightPaneWidth, static_cast<float>(geometry.winWidth) -
-                                                           4.0f * geometry.pad - uiState.leftPaneWidthState - minCenterWidth);
+                                   3.0f * geometry.pad - minCenterWidth);
         uiState.rightPaneWidthState = clampUiFloat(uiState.rightPaneWidthState, minRightPaneWidth, maxRight);
 
-        const float maxLeftAfterRight = std::max(minLeftPaneWidth, static_cast<float>(geometry.winWidth) -
-                                                                   4.0f * geometry.pad - uiState.rightPaneWidthState - minCenterWidth);
-        uiState.leftPaneWidthState = clampUiFloat(uiState.leftPaneWidthState, minLeftPaneWidth, maxLeftAfterRight);
+        uiState.leftPaneWidthState = 0.0f;
     };
 
     auto clampRowHeights = [&]() {
@@ -108,11 +103,7 @@ void updateWorkspaceLayout(GLFWwindow* window,
     const bool mouseClicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left);
     const bool mouseDown = ImGui::IsMouseDown(ImGuiMouseButton_Left);
 
-    const bool hoverLeftVerticalSplitter = pointInRect(mouse,
-                                                       leftX + leftPaneWidth,
-                                                       geometry.contentTop,
-                                                       leftX + leftPaneWidth + geometry.pad,
-                                                       geometry.contentBottom);
+    const bool hoverLeftVerticalSplitter = false;
     const bool hoverRightVerticalSplitter = pointInRect(mouse,
                                                         rightX - geometry.pad,
                                                         geometry.contentTop,
@@ -133,11 +124,7 @@ void updateWorkspaceLayout(GLFWwindow* window,
                     rightModifierY + rightModifierH + geometry.pad);
 
     if (uiState.activeLayoutSplitter == 0 && mouseClicked) {
-        if (hoverLeftVerticalSplitter) {
-            uiState.activeLayoutSplitter = 1;
-            uiState.splitterStartMouseX = mouse.x;
-            uiState.splitterStartValue = uiState.leftPaneWidthState;
-        } else if (hoverRightVerticalSplitter) {
+        if (hoverRightVerticalSplitter) {
             uiState.activeLayoutSplitter = 2;
             uiState.splitterStartMouseX = mouse.x;
             uiState.splitterStartValue = uiState.rightPaneWidthState;
@@ -153,9 +140,7 @@ void updateWorkspaceLayout(GLFWwindow* window,
     }
 
     if (uiState.activeLayoutSplitter != 0 && mouseDown) {
-        if (uiState.activeLayoutSplitter == 1) {
-            uiState.leftPaneWidthState = uiState.splitterStartValue + (mouse.x - uiState.splitterStartMouseX);
-        } else if (uiState.activeLayoutSplitter == 2) {
+        if (uiState.activeLayoutSplitter == 2) {
             uiState.rightPaneWidthState = uiState.splitterStartValue - (mouse.x - uiState.splitterStartMouseX);
         } else if (uiState.activeLayoutSplitter == 4) {
             uiState.rightSceneHeightState = uiState.splitterStartValue + (mouse.y - uiState.splitterStartMouseY);
@@ -172,7 +157,6 @@ void updateWorkspaceLayout(GLFWwindow* window,
 
     const bool onVerticalSplitter = hoverLeftVerticalSplitter ||
                                     hoverRightVerticalSplitter ||
-                                    uiState.activeLayoutSplitter == 1 ||
                                     uiState.activeLayoutSplitter == 2;
     const bool onHorizontalSplitter = hoverLeftHorizontalSplitter ||
                                       hoverRightSceneModifierSplitter ||
@@ -211,7 +195,7 @@ void updateWorkspaceLayout(GLFWwindow* window,
         geometry.rightShortcutsH = 0.0f;
     }
 
-    geometry.centerX = geometry.leftX + geometry.leftPaneWidth + geometry.pad;
+    geometry.centerX = geometry.leftX;
     geometry.centerY = geometry.contentTop;
     geometry.centerW = std::max(120.0f, geometry.rightX - geometry.pad - geometry.centerX);
     geometry.centerH = geometry.contentHeight;
@@ -221,12 +205,6 @@ void drawWorkspaceSplitters(const UiWorkspaceGeometry& geometry,
                             bool showHelpPopup) {
     ImDrawList* splitterDrawList = ImGui::GetForegroundDrawList();
     const ImU32 splitterColor = IM_COL32(120, 120, 120, 170);
-
-    splitterDrawList->AddLine(
-        ImVec2(geometry.leftX + geometry.leftPaneWidth + geometry.pad * 0.5f, geometry.contentTop),
-        ImVec2(geometry.leftX + geometry.leftPaneWidth + geometry.pad * 0.5f, geometry.contentBottom),
-        splitterColor,
-        1.0f);
 
     splitterDrawList->AddLine(
         ImVec2(geometry.rightX - geometry.pad * 0.5f, geometry.contentTop),

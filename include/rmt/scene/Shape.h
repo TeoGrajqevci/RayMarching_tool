@@ -13,6 +13,11 @@
 
 namespace rmt {
 
+struct CurveNode {
+    float position[3] = { 0.0f, 0.0f, 0.0f };
+    float radius = 0.1f;
+};
+
 struct Shape {
     int type;
     float center[3];
@@ -32,16 +37,30 @@ struct Shape {
     float albedo[3];
     float metallic;
     float roughness;
+    std::string albedoTexturePath;
+    std::string roughnessTexturePath;
+    std::string metallicTexturePath;
+    std::string normalTexturePath;
+    std::string displacementTexturePath;
+    float displacementStrength = 0.0f;
     float emission[3] = { 0.0f, 0.0f, 0.0f };
     float emissionStrength = 0.0f;
     float transmission = 0.0f;
     float ior = 1.5f;
+    float dispersion = 0.0f;
+    std::vector<CurveNode> curveNodes;
     bool bendModifierEnabled = false;
     bool twistModifierEnabled = false;
     bool mirrorModifierEnabled = false;
     bool mirrorAxis[3] = { false, false, false };
     float mirrorOffset[3] = { 0.0f, 0.0f, 0.0f };
     float mirrorSmoothness = 0.0f;
+    bool arrayModifierEnabled = false;
+    bool arrayAxis[3] = { false, false, false };
+    float arraySpacing[3] = { 2.0f, 2.0f, 2.0f };
+    int arrayRepeatCount[3] = { 3, 3, 3 };
+    float arraySmoothness = 0.0f;
+    int modifierStack[3] = { SHAPE_MODIFIER_BEND, SHAPE_MODIFIER_TWIST, SHAPE_MODIFIER_ARRAY };
 };
 
 int pickRayMarchSDF(const float rayOrigin[3], const float rayDir[3],

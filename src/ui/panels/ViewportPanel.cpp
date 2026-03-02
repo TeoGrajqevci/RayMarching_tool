@@ -26,7 +26,8 @@ ImDrawList* renderViewportPanel(const UiWorkspaceGeometry& geometry,
                  ImGuiWindowFlags_NoCollapse |
                  ImGuiWindowFlags_NoScrollbar |
                  ImGuiWindowFlags_NoScrollWithMouse |
-                 ImGuiWindowFlags_NoBackground);
+                 ImGuiWindowFlags_NoBackground |
+                 ImGuiWindowFlags_NoDecoration);
     {
         viewportHovered = ImGui::IsWindowHovered();
         viewportDrawList = ImGui::GetWindowDrawList();
@@ -42,12 +43,6 @@ ImDrawList* renderViewportPanel(const UiWorkspaceGeometry& geometry,
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         const ImVec2 viewportMax(contentStart.x + contentSize.x, contentStart.y + contentSize.y);
         drawList->AddRect(contentStart, viewportMax, IM_COL32(120, 120, 120, 180));
-        drawList->AddText(ImVec2(contentStart.x + 10.0f, contentStart.y + 8.0f),
-                          IM_COL32(220, 220, 220, 200),
-                          "Viewport");
-        drawList->AddText(ImVec2(contentStart.x + 10.0f, contentStart.y + 26.0f),
-                          IM_COL32(190, 190, 190, 190),
-                          "LMB orbit | Shift + LMB pan | Shift + A add shape | Drop OBJ/FBX");
     }
     ImGui::End();
 

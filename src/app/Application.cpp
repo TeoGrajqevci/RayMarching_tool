@@ -132,7 +132,7 @@ int runApplication(int argc, char** argv) {
     initialSphere.fractalExtra[0] = 1.0f;
     initialSphere.fractalExtra[1] = 1.0f;
     initialSphere.extra = 0.0f;
-    initialSphere.scaleMode = SCALE_MODE_ELONGATE;
+    initialSphere.scaleMode = SCALE_MODE_DEFORM;
     initialSphere.elongation[0] = initialSphere.elongation[1] = initialSphere.elongation[2] = 0.0f;
     initialSphere.twist[0] = initialSphere.twist[1] = initialSphere.twist[2] = 0.0f;
     initialSphere.bend[0] = initialSphere.bend[1] = initialSphere.bend[2] = 0.0f;
@@ -144,6 +144,20 @@ int runApplication(int argc, char** argv) {
     initialSphere.mirrorOffset[1] = 0.0f;
     initialSphere.mirrorOffset[2] = 0.0f;
     initialSphere.mirrorSmoothness = 0.0f;
+    initialSphere.arrayModifierEnabled = false;
+    initialSphere.arrayAxis[0] = false;
+    initialSphere.arrayAxis[1] = false;
+    initialSphere.arrayAxis[2] = false;
+    initialSphere.arraySpacing[0] = 2.0f;
+    initialSphere.arraySpacing[1] = 2.0f;
+    initialSphere.arraySpacing[2] = 2.0f;
+    initialSphere.arrayRepeatCount[0] = 3;
+    initialSphere.arrayRepeatCount[1] = 3;
+    initialSphere.arrayRepeatCount[2] = 3;
+    initialSphere.arraySmoothness = 0.0f;
+    initialSphere.modifierStack[0] = SHAPE_MODIFIER_BEND;
+    initialSphere.modifierStack[1] = SHAPE_MODIFIER_TWIST;
+    initialSphere.modifierStack[2] = SHAPE_MODIFIER_ARRAY;
     initialSphere.name = "0";
     initialSphere.blendOp = BLEND_NONE;
     initialSphere.smoothness = 0.1f;
@@ -158,6 +172,7 @@ int runApplication(int argc, char** argv) {
     initialSphere.emissionStrength = 0.0f;
     initialSphere.transmission = 0.0f;
     initialSphere.ior = 1.5f;
+    initialSphere.dispersion = 0.0f;
     shapes.push_back(initialSphere);
 
     if (benchmarkOptions.evenMixShapeCount > 0) {

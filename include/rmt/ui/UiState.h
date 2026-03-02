@@ -20,6 +20,10 @@ struct UiRuntimeState {
     int elongateScaleDragShape;
     float elongateScaleStartScale[3];
     float elongateScaleStartElongation[3];
+    bool curveNodeScaleDragActive;
+    int curveNodeScaleDragShape;
+    int curveNodeScaleDragNode;
+    float curveNodeScaleStartRadius;
     bool gizmoAxisColorsSwapped;
     bool showExportDialog;
     char exportFilename[512];

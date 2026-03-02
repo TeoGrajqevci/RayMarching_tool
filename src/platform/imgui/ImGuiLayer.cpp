@@ -9,6 +9,9 @@ void ImGuiLayer::Init(GLFWwindow* window) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
+#if defined(__APPLE__)
+    io.ConfigMacOSXBehaviors = true;
+#endif
     ImGuiStyle& style = ImGui::GetStyle();
     style.WindowRounding    = 4.0f;
     style.FrameRounding     = 2.0f;

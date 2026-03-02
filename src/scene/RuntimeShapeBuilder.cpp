@@ -12,8 +12,47 @@ namespace rmt {
 
 namespace {
 
-void finalizeRuntimeShapeRadii(RuntimeShapeData& out) {
-    float baseRadius = primitiveRadiusForShape(out.type, out.param);
+void sanitizeModifierStack(const int inStack[3], int outStack[3]) {
+    const int defaults[3] = { SHAPE_MODIFIER_BEND, SHAPE_MODIFIER_TWIST, SHAPE_MODIFIER_ARRAY };
+    bool used[3] = { false, false, false };
+    int writeIndex = 0;
+
+    for (int i = 0; i < 3; ++i) {
+        const int value = inStack[i];
+        if (value < SHAPE_MODIFIER_BEND || value > SHAPE_MODIFIER_ARRAY) {
+            continue;
+        }
+        if (!used[value]) {
+            outStack[writeIndex++] = value;
+            used[value] = true;
+        }
+    }
+
+    for (int i = 0; i < 3; ++i) {
+        const int value = defaults[i];
+        if (!used[value]) {
+            outStack[writeIndex++] = value;
+            used[value] = true;
+        }
+    }
+}
+
+void finalizeRuntimeShapeRadii(RuntimeShapeData& out, float displacementPadding) {
+    float baseRadius = 0.0f;
+    if (out.type == SHAPE_CURVE) {
+        baseRadius = 0.01f;
+        for (int i = 0; i < out.curveNodeCount; ++i) {
+            const int base = i * 4;
+            const float nx = out.curveNodes[base + 0];
+            const float ny = out.curveNodes[base + 1];
+            const float nz = out.curveNodes[base + 2];
+            const float radius = std::max(out.curveNodes[base + 3], 0.001f);
+            const float d = std::sqrt(nx * nx + ny * ny + nz * nz) + radius;
+            baseRadius = std::max(baseRadius, d);
+        }
+    } else {
+        baseRadius = primitiveRadiusForShape(out.type, out.param);
+    }
     const float maxScale = std::max(out.scale[0], std::max(out.scale[1], out.scale[2]));
     baseRadius *= maxScale;
 
@@ -38,6 +77,27 @@ void finalizeRuntimeShapeRadii(RuntimeShapeData& out) {
                           mirrorCenterOffset +
                           std::max(out.smoothness, 0.0f) +
                           std::max(out.mirrorSmoothness, 0.0f);
+
+    if ((out.flags & RUNTIME_SHAPE_HAS_ARRAY) != 0) {
+        const float arrayOffsetX = out.arrayAxis[0] > 0.5f
+            ? 0.5f * std::max(out.arrayRepeatCount[0] - 1.0f, 0.0f) * std::max(out.arraySpacing[0], 0.0f)
+            : 0.0f;
+        const float arrayOffsetY = out.arrayAxis[1] > 0.5f
+            ? 0.5f * std::max(out.arrayRepeatCount[1] - 1.0f, 0.0f) * std::max(out.arraySpacing[1], 0.0f)
+            : 0.0f;
+        const float arrayOffsetZ = out.arrayAxis[2] > 0.5f
+            ? 0.5f * std::max(out.arrayRepeatCount[2] - 1.0f, 0.0f) * std::max(out.arraySpacing[2], 0.0f)
+            : 0.0f;
+        const float arrayCenterOffset = std::sqrt(arrayOffsetX * arrayOffsetX +
+                                                  arrayOffsetY * arrayOffsetY +
+                                                  arrayOffsetZ * arrayOffsetZ);
+        out.boundRadius += arrayCenterOffset;
+        out.influenceRadius += arrayCenterOffset + std::max(out.arraySmoothness, 0.0f);
+    }
+
+    const float safeDisplacementPadding = std::max(displacementPadding, 0.0f);
+    out.boundRadius += safeDisplacementPadding;
+    out.influenceRadius += safeDisplacementPadding;
 }
 
 } // namespace
@@ -83,6 +143,9 @@ void packPrimitiveParameters(const Shape& shape, int primitiveType, float out[4]
             out[0] = std::max(shape.param[0], 0.001f);
             out[1] = shape.param[1];
             break;
+        case SHAPE_CURVE:
+            out[0] = std::max(shape.param[0], 0.01f);
+            break;
         default:
             break;
     }
@@ -99,7 +162,7 @@ void packFractalExtraParameters(const Shape& shape, int primitiveType, float out
 }
 
 RuntimeShapeData buildRuntimeShapeData(const Shape& shape) {
-    RuntimeShapeData out;
+    RuntimeShapeData out{};
     out.type = shape.type;
     out.blendOp = shape.blendOp;
     out.flags = 0;
@@ -111,6 +174,32 @@ RuntimeShapeData buildRuntimeShapeData(const Shape& shape) {
 
     packPrimitiveParameters(shape, shape.type, out.param);
     packFractalExtraParameters(shape, shape.type, out.fractalExtra);
+
+    out.curveNodeCount = 0;
+    for (int i = 0; i < RuntimeShapeData::kMaxCurveNodes * 4; ++i) {
+        out.curveNodes[i] = 0.0f;
+    }
+
+    if (shape.type == SHAPE_CURVE) {
+        const int nodeCount = std::min(static_cast<int>(shape.curveNodes.size()), RuntimeShapeData::kMaxCurveNodes);
+        out.curveNodeCount = std::max(nodeCount, 1);
+
+        if (nodeCount <= 0) {
+            out.curveNodes[0] = 0.0f;
+            out.curveNodes[1] = 0.0f;
+            out.curveNodes[2] = 0.0f;
+            out.curveNodes[3] = std::max(shape.param[0], 0.05f);
+        } else {
+            for (int i = 0; i < nodeCount; ++i) {
+                const CurveNode& node = shape.curveNodes[static_cast<std::size_t>(i)];
+                const int base = i * 4;
+                out.curveNodes[base + 0] = node.position[0];
+                out.curveNodes[base + 1] = node.position[1];
+                out.curveNodes[base + 2] = node.position[2];
+                out.curveNodes[base + 3] = std::max(node.radius, 0.001f);
+            }
+        }
+    }
 
     const bool hasRotation = anyAbsGreaterThan(shape.rotation, 1e-6f);
     if (hasRotation) {
@@ -171,12 +260,48 @@ RuntimeShapeData buildRuntimeShapeData(const Shape& shape) {
         ? std::max(shape.mirrorSmoothness, 0.0f)
         : 0.0f;
 
+    const int repeatX = std::max(shape.arrayRepeatCount[0], 1);
+    const int repeatY = std::max(shape.arrayRepeatCount[1], 1);
+    const int repeatZ = std::max(shape.arrayRepeatCount[2], 1);
+    const bool arrayXActive = shape.arrayModifierEnabled && shape.arrayAxis[0] && repeatX > 1;
+    const bool arrayYActive = shape.arrayModifierEnabled && shape.arrayAxis[1] && repeatY > 1;
+    const bool arrayZActive = shape.arrayModifierEnabled && shape.arrayAxis[2] && repeatZ > 1;
+
+    out.arrayAxis[0] = arrayXActive ? 1.0f : 0.0f;
+    out.arrayAxis[1] = arrayYActive ? 1.0f : 0.0f;
+    out.arrayAxis[2] = arrayZActive ? 1.0f : 0.0f;
+    out.arraySpacing[0] = arrayXActive ? std::max(std::fabs(shape.arraySpacing[0]), 1e-4f) : 0.0f;
+    out.arraySpacing[1] = arrayYActive ? std::max(std::fabs(shape.arraySpacing[1]), 1e-4f) : 0.0f;
+    out.arraySpacing[2] = arrayZActive ? std::max(std::fabs(shape.arraySpacing[2]), 1e-4f) : 0.0f;
+    out.arrayRepeatCount[0] = arrayXActive ? static_cast<float>(repeatX) : 1.0f;
+    out.arrayRepeatCount[1] = arrayYActive ? static_cast<float>(repeatY) : 1.0f;
+    out.arrayRepeatCount[2] = arrayZActive ? static_cast<float>(repeatZ) : 1.0f;
+    out.arraySmoothness = shape.arrayModifierEnabled ? std::max(shape.arraySmoothness, 0.0f) : 0.0f;
+
+    int sanitizedModifierStack[3] = { SHAPE_MODIFIER_BEND, SHAPE_MODIFIER_TWIST, SHAPE_MODIFIER_ARRAY };
+    sanitizeModifierStack(shape.modifierStack, sanitizedModifierStack);
+    out.modifierStack[0] = static_cast<float>(sanitizedModifierStack[0]);
+    out.modifierStack[1] = static_cast<float>(sanitizedModifierStack[1]);
+    out.modifierStack[2] = static_cast<float>(sanitizedModifierStack[2]);
+
+    if (arrayXActive || arrayYActive || arrayZActive) {
+        out.flags |= RUNTIME_SHAPE_HAS_ARRAY;
+    } else {
+        out.arraySpacing[0] = 0.0f;
+        out.arraySpacing[1] = 0.0f;
+        out.arraySpacing[2] = 0.0f;
+        out.arrayRepeatCount[0] = 1.0f;
+        out.arrayRepeatCount[1] = 1.0f;
+        out.arrayRepeatCount[2] = 1.0f;
+        out.arraySmoothness = 0.0f;
+    }
+
     out.smoothness = std::max(shape.smoothness, 1e-4f);
     if (shape.scaleMode == SCALE_MODE_ELONGATE) {
         out.flags |= RUNTIME_SHAPE_SCALE_MODE_ELONGATE;
     }
 
-    finalizeRuntimeShapeRadii(out);
+    finalizeRuntimeShapeRadii(out, shape.displacementStrength);
     return out;
 }
 
@@ -185,7 +310,7 @@ RuntimeShapeData buildRuntimeShapeDataForPrimitive(const Shape& shape, int primi
     out.type = primitiveType;
     packPrimitiveParameters(shape, primitiveType, out.param);
     packFractalExtraParameters(shape, primitiveType, out.fractalExtra);
-    finalizeRuntimeShapeRadii(out);
+    finalizeRuntimeShapeRadii(out, shape.displacementStrength);
     return out;
 }
 

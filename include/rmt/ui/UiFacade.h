@@ -10,6 +10,7 @@
 
 #include "rmt/input/Input.h"
 #include "rmt/io/mesh/export/MeshExporter.h"
+#include "rmt/platform/glfw/FileDropQueue.h"
 #include "rmt/platform/imgui/ImGuiLayer.h"
 #include "rmt/RenderSettings.h"
 #include "rmt/scene/Shape.h"
@@ -37,9 +38,12 @@ public:
                    bool& showHelpPopup, ImVec2& helpButtonPos,
                    bool& showConsole, TransformationState& transformState,
                    const float cameraPos[3], const float cameraTarget[3],
+                   float& camTheta, float& camPhi,
                    RenderSettings& renderSettings,
                    bool denoiserAvailable, bool denoiserUsingGPU,
-                   int pathSampleCount);
+                   int pathSampleCount,
+                   const std::vector<DroppedFileEvent>& droppedFiles,
+                   std::vector<char>& consumedDropFlags);
 
 private:
     ImVec2 viewportPos;

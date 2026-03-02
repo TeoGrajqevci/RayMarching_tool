@@ -423,6 +423,220 @@ void updatePointLightTool(GLFWwindow* window,
     }
 }
 
+void updateCurveNodeTool(GLFWwindow* window,
+                         std::vector<Shape>& shapes,
+                         const std::vector<int>& selectedShapes,
+                         TransformationState& ts,
+                         const float cameraPos[3],
+                         const float cameraTarget[3],
+                         const ImVec2& viewportPos,
+                         const ImVec2& viewportSize) {
+    auto clearMoveState = [&]() {
+        ts.curveNodeMoveModeActive = false;
+        ts.curveNodeMoveConstrained = false;
+        ts.curveNodeMoveAxis = -1;
+    };
+
+    auto clearScaleState = [&]() {
+        ts.curveNodeScaleModeActive = false;
+    };
+
+    if (!ts.curveEditMode || selectedShapes.size() != 1) {
+        clearMoveState();
+        clearScaleState();
+        ts.curveNodeMoveKeyHandled = false;
+        ts.curveNodeScaleKeyHandled = false;
+        return;
+    }
+
+    const int shapeIndex = selectedShapes[0];
+    if (shapeIndex < 0 || shapeIndex >= static_cast<int>(shapes.size()) ||
+        shapes[shapeIndex].type != SHAPE_CURVE ||
+        !ts.curveNodeSelected ||
+        ts.curveNodeShapeIndex != shapeIndex ||
+        ts.curveNodeIndex < 0 ||
+        ts.curveNodeIndex >= static_cast<int>(shapes[shapeIndex].curveNodes.size())) {
+        clearMoveState();
+        clearScaleState();
+        return;
+    }
+
+    CurveNode& node = shapes[shapeIndex].curveNodes[static_cast<std::size_t>(ts.curveNodeIndex)];
+
+    double viewportX = viewportPos.x;
+    double viewportY = viewportPos.y;
+    double viewportW = viewportSize.x;
+    double viewportH = viewportSize.y;
+    if (viewportW <= 1.0 || viewportH <= 1.0) {
+        int winWidth = 1;
+        int winHeight = 1;
+        glfwGetWindowSize(window, &winWidth, &winHeight);
+        viewportX = 0.0;
+        viewportY = 0.0;
+        viewportW = std::max(1, winWidth);
+        viewportH = std::max(1, winHeight);
+    }
+
+    if (!ImGui::GetIO().WantCaptureKeyboard) {
+        if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS && !ts.curveNodeMoveKeyHandled &&
+            !ts.translationModeActive && !ts.rotationModeActive && !ts.scaleModeActive &&
+            !ts.mirrorHelperMoveModeActive && !ts.sunLightMoveModeActive && !ts.sunLightHandleDragActive &&
+            !ts.pointLightMoveModeActive) {
+            ts.curveNodeMoveKeyHandled = true;
+            ts.curveNodeMoveModeActive = true;
+            ts.curveNodeMoveConstrained = false;
+            ts.curveNodeMoveAxis = -1;
+            glfwGetCursorPos(window, &ts.curveNodeMoveStartMouseX, &ts.curveNodeMoveStartMouseY);
+            ts.curveNodeMoveStartPosition[0] = node.position[0];
+            ts.curveNodeMoveStartPosition[1] = node.position[1];
+            ts.curveNodeMoveStartPosition[2] = node.position[2];
+        }
+        if (glfwGetKey(window, GLFW_KEY_G) == GLFW_RELEASE) {
+            ts.curveNodeMoveKeyHandled = false;
+        }
+
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS && !ts.curveNodeScaleKeyHandled &&
+            !ts.translationModeActive && !ts.rotationModeActive && !ts.scaleModeActive &&
+            !ts.mirrorHelperMoveModeActive && !ts.sunLightMoveModeActive && !ts.sunLightHandleDragActive &&
+            !ts.pointLightMoveModeActive) {
+            ts.curveNodeScaleKeyHandled = true;
+            ts.curveNodeScaleModeActive = true;
+            glfwGetCursorPos(window, &ts.curveNodeScaleStartMouseX, &ts.curveNodeScaleStartMouseY);
+            ts.curveNodeScaleStartRadius = std::max(node.radius, 0.001f);
+        }
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_RELEASE) {
+            ts.curveNodeScaleKeyHandled = false;
+        }
+    }
+
+    if (ts.curveNodeMoveModeActive) {
+        double currentMouseX = 0.0;
+        double currentMouseY = 0.0;
+        glfwGetCursorPos(window, &currentMouseX, &currentMouseY);
+        const double deltaX = currentMouseX - ts.curveNodeMoveStartMouseX;
+        const double deltaY = currentMouseY - ts.curveNodeMoveStartMouseY;
+        const float sensitivity = 0.01f;
+
+        float deltaMove[3] = {0.0f, 0.0f, 0.0f};
+        if (ts.curveNodeMoveConstrained && ts.curveNodeMoveAxis >= 0 && ts.curveNodeMoveAxis < 3) {
+            const float dragAmount = constrainedAxisDragAmountForSun(ts.curveNodeMoveAxis, deltaX, deltaY, sensitivity);
+            deltaMove[ts.curveNodeMoveAxis] = dragAmount;
+        } else {
+            float forward[3] = { cameraTarget[0] - cameraPos[0],
+                                 cameraTarget[1] - cameraPos[1],
+                                 cameraTarget[2] - cameraPos[2] };
+            float fLen = std::sqrt(forward[0] * forward[0] + forward[1] * forward[1] + forward[2] * forward[2]);
+            if (fLen > 1e-6f) {
+                forward[0] /= fLen;
+                forward[1] /= fLen;
+                forward[2] /= fLen;
+                const float upDefault[3] = {0.0f, 1.0f, 0.0f};
+                float right[3] = {
+                    forward[1] * upDefault[2] - forward[2] * upDefault[1],
+                    forward[2] * upDefault[0] - forward[0] * upDefault[2],
+                    forward[0] * upDefault[1] - forward[1] * upDefault[0]
+                };
+                float rLen = std::sqrt(right[0] * right[0] + right[1] * right[1] + right[2] * right[2]);
+                if (rLen > 1e-6f) {
+                    right[0] /= rLen;
+                    right[1] /= rLen;
+                    right[2] /= rLen;
+                    const float up[3] = {
+                        right[1] * forward[2] - right[2] * forward[1],
+                        right[2] * forward[0] - right[0] * forward[2],
+                        right[0] * forward[1] - right[1] * forward[0]
+                    };
+                    deltaMove[0] = static_cast<float>(deltaX) * sensitivity * right[0] -
+                                   static_cast<float>(deltaY) * sensitivity * up[0];
+                    deltaMove[1] = static_cast<float>(deltaX) * sensitivity * right[1] -
+                                   static_cast<float>(deltaY) * sensitivity * up[1];
+                    deltaMove[2] = static_cast<float>(deltaX) * sensitivity * right[2] -
+                                   static_cast<float>(deltaY) * sensitivity * up[2];
+                }
+            }
+        }
+
+        node.position[0] = ts.curveNodeMoveStartPosition[0] + deltaMove[0];
+        node.position[1] = ts.curveNodeMoveStartPosition[1] + deltaMove[1];
+        node.position[2] = ts.curveNodeMoveStartPosition[2] + deltaMove[2];
+
+        if (!ts.curveNodeMoveConstrained && !ImGui::GetIO().WantCaptureKeyboard) {
+            if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS) {
+                ts.curveNodeMoveConstrained = true;
+                ts.curveNodeMoveAxis = 0;
+                glfwGetCursorPos(window, &ts.curveNodeMoveStartMouseX, &ts.curveNodeMoveStartMouseY);
+                ts.curveNodeMoveStartPosition[0] = node.position[0];
+                ts.curveNodeMoveStartPosition[1] = node.position[1];
+                ts.curveNodeMoveStartPosition[2] = node.position[2];
+            } else if (glfwGetKey(window, GLFW_KEY_Y) == GLFW_PRESS) {
+                ts.curveNodeMoveConstrained = true;
+                ts.curveNodeMoveAxis = 1;
+                glfwGetCursorPos(window, &ts.curveNodeMoveStartMouseX, &ts.curveNodeMoveStartMouseY);
+                ts.curveNodeMoveStartPosition[0] = node.position[0];
+                ts.curveNodeMoveStartPosition[1] = node.position[1];
+                ts.curveNodeMoveStartPosition[2] = node.position[2];
+            } else if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS) {
+                ts.curveNodeMoveConstrained = true;
+                ts.curveNodeMoveAxis = 2;
+                glfwGetCursorPos(window, &ts.curveNodeMoveStartMouseX, &ts.curveNodeMoveStartMouseY);
+                ts.curveNodeMoveStartPosition[0] = node.position[0];
+                ts.curveNodeMoveStartPosition[1] = node.position[1];
+                ts.curveNodeMoveStartPosition[2] = node.position[2];
+            }
+        }
+
+        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+            double mouseX = 0.0;
+            double mouseY = 0.0;
+            glfwGetCursorPos(window, &mouseX, &mouseY);
+            const bool mouseInViewport =
+                mouseX >= viewportX && mouseX <= (viewportX + viewportW) &&
+                mouseY >= viewportY && mouseY <= (viewportY + viewportH);
+            const bool blockByUiPanel = shouldBlockViewportInput(mouseX, mouseY);
+            if (!blockByUiPanel && mouseInViewport) {
+                clearMoveState();
+            }
+        }
+
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+            node.position[0] = ts.curveNodeMoveStartPosition[0];
+            node.position[1] = ts.curveNodeMoveStartPosition[1];
+            node.position[2] = ts.curveNodeMoveStartPosition[2];
+            clearMoveState();
+        }
+    }
+
+    if (!ts.curveNodeScaleModeActive) {
+        return;
+    }
+
+    double scaleMouseX = 0.0;
+    double scaleMouseY = 0.0;
+    glfwGetCursorPos(window, &scaleMouseX, &scaleMouseY);
+    const double scaleDeltaX = scaleMouseX - ts.curveNodeScaleStartMouseX;
+    const double scaleDeltaY = scaleMouseY - ts.curveNodeScaleStartMouseY;
+    const float scaleDelta = static_cast<float>(scaleDeltaX - scaleDeltaY) * 0.005f;
+    node.radius = std::max(0.001f, ts.curveNodeScaleStartRadius + scaleDelta);
+
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+        double mouseX = 0.0;
+        double mouseY = 0.0;
+        glfwGetCursorPos(window, &mouseX, &mouseY);
+        const bool mouseInViewport =
+            mouseX >= viewportX && mouseX <= (viewportX + viewportW) &&
+            mouseY >= viewportY && mouseY <= (viewportY + viewportH);
+        const bool blockByUiPanel = shouldBlockViewportInput(mouseX, mouseY);
+        if (!blockByUiPanel && mouseInViewport) {
+            clearScaleState();
+        }
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+        node.radius = std::max(0.001f, ts.curveNodeScaleStartRadius);
+        clearScaleState();
+    }
+}
+
 } // namespace
 
 InputManager::InputManager() {
@@ -463,6 +677,15 @@ void InputManager::processTransformationUpdates(GLFWwindow* window,
                            cameraTarget,
                            viewportPos,
                            viewportSize);
+
+    updateCurveNodeTool(window,
+                        shapes,
+                        selectedShapes,
+                        ts,
+                        cameraPos,
+                        cameraTarget,
+                        viewportPos,
+                        viewportSize);
 
     updateTranslationTool(window,
                           shapes,

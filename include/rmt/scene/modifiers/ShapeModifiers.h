@@ -13,5 +13,6 @@ void applyInverseRotationRows(const float rows[9], const float p[3], float out[3
 void applyRotationInverse(const float p[3], const float angles[3], float out[3]);
 void applyTwistCombinedCPU(const float p[3], const float k[3], float out[3]);
 void applyCheapBendCombinedCPU(const float p[3], const float k[3], float out[3]);
+void applyDomainRepeatCombinedCPU(const float p[3], const float axisEnabled[3], const float spacing[3], float out[3]);
 
 } // namespace rmt

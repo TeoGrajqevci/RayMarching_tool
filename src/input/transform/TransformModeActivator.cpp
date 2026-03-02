@@ -82,7 +82,7 @@ void InputManager::processTransformationModeActivation(GLFWwindow* window,
         !ts.mirrorHelperMoveModeActive && !ts.sunLightMoveModeActive &&
         !ts.sunLightHandleDragActive && !ts.pointLightMoveModeActive &&
         !ImGui::GetIO().WantCaptureKeyboard) {
-        if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS && !ts.translationKeyHandled) {
+        if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS && !ts.translationKeyHandled && !ts.curveEditMode) {
             ts.translationKeyHandled = true;
             bool startedMirrorHelperMove = false;
             bool startedSunLightMove = false;
@@ -211,7 +211,7 @@ void InputManager::processTransformationModeActivation(GLFWwindow* window,
             }
         }
 
-        if (!selectedShapes.empty() && glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS && !ts.scaleKeyHandled) {
+        if (!selectedShapes.empty() && glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS && !ts.scaleKeyHandled && !ts.curveEditMode) {
             clearSunLightSelection();
             clearPointLightSelection();
             ts.scaleModeActive = true;

@@ -20,6 +20,8 @@ void renderViewportGizmo(ImDrawList* viewportDrawList,
                          float lightDir[3],
                          const float cameraPos[3],
                          const float cameraTarget[3],
+                         float& camTheta,
+                         float& camPhi,
                          const RenderSettings& renderSettings,
                          UiRuntimeState& uiState);
 

@@ -19,6 +19,16 @@ public:
     void bind(GLenum textureUnit) const;
 };
 
+struct MaterialTextureInfo {
+    GLuint textureId = 0;
+    int width = 0;
+    int height = 0;
+};
+
+bool isSupportedMaterialTextureFile(const std::string& path);
+bool acquireMaterialTexture(const std::string& path, MaterialTextureInfo& outInfo);
+void releaseMaterialTextureCache();
+
 } // namespace rmt
 
 #endif // RMT_RENDERING_TEXTURE_2D_H

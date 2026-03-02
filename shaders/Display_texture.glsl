@@ -10,6 +10,16 @@ uniform vec3 uCameraTarget;
 uniform float uCameraFovDegrees;
 uniform int uCameraProjectionMode;
 uniform float uCameraOrthoScale;
+uniform int uPhysicalCameraEnabled;
+uniform float uPhysicalCameraFocalLengthMm;
+uniform vec2 uPhysicalCameraSensorSizeMm;
+uniform float uPhysicalCameraLensRadius;
+uniform float uPhysicalCameraFocusDistance;
+uniform int uPhysicalCameraBladeCount;
+uniform float uPhysicalCameraBladeRotationRad;
+uniform float uPhysicalCameraAnamorphicRatio;
+uniform float uPhysicalCameraChromaticAberration;
+uniform float uPathTracerExposureScale;
 uniform int uMirrorHelperShow;
 uniform vec3 uMirrorHelperAxisEnabled;
 uniform vec3 uMirrorHelperOffset;
@@ -20,38 +30,91 @@ uniform int uMirrorHelperSelectedAxis;
 
 vec3 AgXToneMapping(vec3 color) {
     vec3 aces = clamp((color * (color + 0.0245786) - 0.000090537) /
-                      (color * (0.983729 * color + 0.4329510) + 0.238081),
-                      0.0, 1.0);
+        (color * (0.983729 * color + 0.4329510) + 0.238081), 0.0, 1.0);
     return mix(aces, color, 0.35);
+}
+
+vec2 computePerspectiveOffset(vec2 uv, float viewportAspect) {
+    vec2 p = (uv - 0.5) * 2.0;
+    bool physicalCameraEnabled = (uPhysicalCameraEnabled == 1) && (uCameraProjectionMode == 0);
+    if(physicalCameraEnabled) {
+        float focalLengthMm = max(uPhysicalCameraFocalLengthMm, 1e-4);
+        vec2 sensorSizeMm = max(uPhysicalCameraSensorSizeMm, vec2(1e-4));
+        float sensorAspect = sensorSizeMm.x / max(sensorSizeMm.y, 1e-4);
+        vec2 effectiveSensorSize = sensorSizeMm;
+        if(viewportAspect > sensorAspect) {
+            effectiveSensorSize.y = sensorSizeMm.x / max(viewportAspect, 1e-4);
+        } else {
+            effectiveSensorSize.x = sensorSizeMm.y * viewportAspect;
+        }
+
+        return vec2(p.x * ((effectiveSensorSize.x * 0.5) / focalLengthMm),
+                    p.y * ((effectiveSensorSize.y * 0.5) / focalLengthMm));
+    }
+
+    vec2 pScreen = p;
+    pScreen.x *= viewportAspect;
+    float tanHalfFov = tan(radians(clamp(uCameraFovDegrees, 1.0, 179.0)) * 0.5);
+    return pScreen * tanHalfFov;
+}
+
+vec3 samplePathTextureWithChromaticAberration(vec2 uv) {
+    bool physicalCameraEnabled = (uPhysicalCameraEnabled == 1) && (uCameraProjectionMode == 0);
+    float aberrationAmountPx = physicalCameraEnabled ? max(uPhysicalCameraChromaticAberration, 0.0) : 0.0;
+    if(aberrationAmountPx <= 1e-6) {
+        return texture(uTexture, clamp(uv, vec2(0.0), vec2(1.0))).rgb;
+    }
+
+    vec2 centered = uv - vec2(0.5);
+    float radius = length(centered);
+    if(radius <= 1e-6) {
+        return texture(uTexture, clamp(uv, vec2(0.0), vec2(1.0))).rgb;
+    }
+
+    vec2 direction = centered / radius;
+    float minRes = max(min(uResolution.x, uResolution.y), 1.0);
+    float shiftPixels = aberrationAmountPx * radius * radius;
+    vec2 uvShift = direction * (shiftPixels / minRes);
+
+    vec2 uvR = clamp(uv + uvShift, vec2(0.0), vec2(1.0));
+    vec2 uvG = clamp(uv, vec2(0.0), vec2(1.0));
+    vec2 uvB = clamp(uv - uvShift, vec2(0.0), vec2(1.0));
+
+    float r = texture(uTexture, uvR).r;
+    float g = texture(uTexture, uvG).g;
+    float b = texture(uTexture, uvB).b;
+    return vec3(r, g, b);
 }
 
 void computeDisplayRay(out vec3 ro, out vec3 rd) {
     vec2 uv = fragCoord * 0.5 + 0.5;
+    float viewportAspect = uResolution.x / max(uResolution.y, 1.0);
     vec2 pScreen = (uv - 0.5) * 2.0;
-    pScreen.x *= uResolution.x / max(uResolution.y, 1.0);
+    pScreen.x *= viewportAspect;
 
     vec3 forward = normalize(uCameraTarget - uCameraPos);
     vec3 right = normalize(cross(forward, vec3(0.0, 1.0, 0.0)));
-    if (length(right) < 1e-5) {
+    if(length(right) < 1e-5) {
         right = vec3(1.0, 0.0, 0.0);
     }
     vec3 up = normalize(cross(right, forward));
 
-    if (uCameraProjectionMode == 1) {
+    if(uCameraProjectionMode == 1) {
         float orthoScale = max(uCameraOrthoScale, 1e-4);
-        ro = uCameraPos + (pScreen.x * right + pScreen.y * up) * orthoScale;
+        float cameraDistance = length(uCameraTarget - uCameraPos);
+        float orthoNearOffset = max(0.05, cameraDistance * 0.05);
+        ro = uCameraPos - forward * orthoNearOffset + (pScreen.x * right + pScreen.y * up) * orthoScale;
         rd = forward;
         return;
     }
 
-    float tanHalfFov = tan(radians(clamp(uCameraFovDegrees, 1.0, 179.0)) * 0.5);
-    vec2 perspectiveOffset = pScreen * tanHalfFov;
+    vec2 perspectiveOffset = computePerspectiveOffset(uv, viewportAspect);
     ro = uCameraPos;
     rd = normalize(forward + perspectiveOffset.x * right + perspectiveOffset.y * up);
 }
 
 vec3 applyMirrorHelperOverlay(vec3 color) {
-    if (uMirrorHelperShow != 1) {
+    if(uMirrorHelperShow != 1) {
         return color;
     }
 
@@ -60,6 +123,9 @@ vec3 applyMirrorHelperOverlay(vec3 color) {
     computeDisplayRay(ro, rd);
 
     float helperExtent = max(uMirrorHelperExtent, 0.1);
+    if(uCameraProjectionMode == 1) {
+        ro -= rd * (helperExtent * 4.0);
+    }
     float helperLineWidth = max(0.03 * helperExtent, 0.03);
     float helperGridSpacing = max(helperExtent * 0.25, 0.25);
 
@@ -67,23 +133,21 @@ vec3 applyMirrorHelperOverlay(vec3 color) {
     vec3 nearestHelperColor = vec3(0.0);
     float nearestHelperAlpha = 0.0;
 
-    for (int axis = 0; axis < 3; ++axis) {
-        float enabled = (axis == 0) ? uMirrorHelperAxisEnabled.x :
-                        ((axis == 1) ? uMirrorHelperAxisEnabled.y : uMirrorHelperAxisEnabled.z);
-        if (enabled < 0.5) {
+    for(int axis = 0; axis < 3; ++axis) {
+        float enabled = (axis == 0) ? uMirrorHelperAxisEnabled.x : ((axis == 1) ? uMirrorHelperAxisEnabled.y : uMirrorHelperAxisEnabled.z);
+        if(enabled < 0.5) {
             continue;
         }
 
         float roA = (axis == 0) ? ro.x : ((axis == 1) ? ro.y : ro.z);
         float rdA = (axis == 0) ? rd.x : ((axis == 1) ? rd.y : rd.z);
-        float planeOffset = (axis == 0) ? uMirrorHelperOffset.x :
-                            ((axis == 1) ? uMirrorHelperOffset.y : uMirrorHelperOffset.z);
-        if (abs(rdA) < 1e-6) {
+        float planeOffset = (axis == 0) ? uMirrorHelperOffset.x : ((axis == 1) ? uMirrorHelperOffset.y : uMirrorHelperOffset.z);
+        if(abs(rdA) < 1e-6) {
             continue;
         }
 
         float tPlane = (planeOffset - roA) / rdA;
-        if (tPlane <= 0.0 || tPlane >= nearestHelperT) {
+        if(tPlane <= 0.0 || tPlane >= nearestHelperT) {
             continue;
         }
 
@@ -91,11 +155,11 @@ vec3 applyMirrorHelperOverlay(vec3 color) {
         vec2 planeUV;
         vec2 planeCenter;
         vec3 planeColor;
-        if (axis == 0) {
+        if(axis == 0) {
             planeUV = pPlane.yz;
             planeCenter = uMirrorHelperCenter.yz;
             planeColor = vec3(1.0, 0.2, 0.2);
-        } else if (axis == 1) {
+        } else if(axis == 1) {
             planeUV = pPlane.xz;
             planeCenter = uMirrorHelperCenter.xz;
             planeColor = vec3(0.2, 0.2, 1.0);
@@ -106,12 +170,12 @@ vec3 applyMirrorHelperOverlay(vec3 color) {
         }
 
         bool isSelectedPlane = (uMirrorHelperSelected == 1) && (axis == uMirrorHelperSelectedAxis);
-        if (isSelectedPlane) {
+        if(isSelectedPlane) {
             planeColor = mix(planeColor, vec3(1.0), 0.5);
         }
 
         vec2 local = planeUV - planeCenter;
-        if (abs(local.x) > helperExtent || abs(local.y) > helperExtent) {
+        if(abs(local.x) > helperExtent || abs(local.y) > helperExtent) {
             continue;
         }
 
@@ -124,18 +188,18 @@ vec3 applyMirrorHelperOverlay(vec3 color) {
         float borderIntensity = 1.0 - smoothstep(0.0, helperLineWidth, borderDist);
 
         float helperAlpha = max(gridIntensity * 0.45, borderIntensity * 0.95);
-        if (isSelectedPlane) {
+        if(isSelectedPlane) {
             helperAlpha = max(helperAlpha, 0.82);
         }
 
-        if (helperAlpha > 0.001) {
+        if(helperAlpha > 0.001) {
             nearestHelperT = tPlane;
             nearestHelperColor = planeColor;
             nearestHelperAlpha = helperAlpha;
         }
     }
 
-    if (nearestHelperAlpha > 0.0) {
+    if(nearestHelperAlpha > 0.0) {
         color = mix(color, nearestHelperColor, clamp(nearestHelperAlpha, 0.0, 0.9));
     }
     return color;
@@ -143,7 +207,8 @@ vec3 applyMirrorHelperOverlay(vec3 color) {
 
 void main() {
     vec2 uv = fragCoord * 0.5 + 0.5;
-    vec3 color = texture(uTexture, uv).rgb;
+    vec3 color = samplePathTextureWithChromaticAberration(uv);
+    color *= max(uPathTracerExposureScale, 0.0);
     color = max(color, vec3(0.0));
     color = AgXToneMapping(color);
     color = pow(color, vec3(1.0 / 2.2));

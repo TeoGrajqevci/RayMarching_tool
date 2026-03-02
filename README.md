@@ -19,6 +19,7 @@ It supports real-time ray marching, a path tracer mode, shape modifiers, mesh im
 - Rendering modes:
   - Real-time ray marching renderer
   - Path tracer renderer with accumulation
+  - Path tracer physical camera controls (focal length, sensor size, aperture DOF, focus distance, chromatic aberration, shutter/ISO exposure)
   - Optional OpenImageDenoise denoising (when a GPU-backed OIDN runtime is detected)
 - Material controls:
   - Albedo, Metallic, Roughness, Emission, Transmission, IOR
@@ -37,6 +38,8 @@ It supports real-time ray marching, a path tracer mode, shape modifiers, mesh im
 - C++11 compiler (clang/gcc/MSVC)
 - OpenGL 3.3 Core compatible GPU/driver
 - Internet access during first CMake configure (dependencies are fetched automatically)
+- First configure auto-populates `third_party/mesh2sdf` when missing
+- On macOS, first configure auto-bootstraps OIDN source into `third_party/oidn-local/oidn-src` when no local/system OIDN is found
 
 Optional:
 
@@ -64,6 +67,10 @@ Run from the build directory:
   - `ON` (default): shallow clones + skip dependency update checks
 - `-DRMT_USE_OPENMP=ON|OFF`
   - `ON`: enables OpenMP for heavy CPU loops (notably mesh export), when compiler support exists
+- `-DRMT_AUTO_BOOTSTRAP_MESH2SDF=ON|OFF`
+  - `ON` (default): clones `mesh2sdf` into `third_party/mesh2sdf` if missing
+- `-DRMT_AUTO_BOOTSTRAP_OIDN_GPU=ON|OFF`
+  - `ON` (default): on macOS, auto-builds a local GPU-capable OIDN source tree when OIDN is not already installed
 
 Example:
 

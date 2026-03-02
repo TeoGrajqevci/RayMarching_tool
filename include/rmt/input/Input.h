@@ -16,6 +16,8 @@ struct GLFWwindow;
 
 namespace rmt {
 
+struct RenderSettings;
+
 struct PointLightState {
     float position[3] = {0.0f, 1.5f, 0.0f};
     float color[3] = {1.0f, 1.0f, 1.0f};
@@ -93,6 +95,25 @@ struct TransformationState {
     double pointLightMoveStartMouseX = 0.0;
     double pointLightMoveStartMouseY = 0.0;
     float pointLightMoveStartPosition[3] = {0.0f, 1.5f, 0.0f};
+
+    bool curveNodeSelected = false;
+    int curveNodeShapeIndex = -1;
+    int curveNodeIndex = -1;
+
+    bool curveEditMode = false;
+    bool curveNodeMoveModeActive = false;
+    bool curveNodeMoveConstrained = false;
+    int curveNodeMoveAxis = -1;
+    bool curveNodeMoveKeyHandled = false;
+    double curveNodeMoveStartMouseX = 0.0;
+    double curveNodeMoveStartMouseY = 0.0;
+    float curveNodeMoveStartPosition[3] = {0.0f, 0.0f, 0.0f};
+
+    bool curveNodeScaleModeActive = false;
+    bool curveNodeScaleKeyHandled = false;
+    double curveNodeScaleStartMouseX = 0.0;
+    double curveNodeScaleStartMouseY = 0.0;
+    float curveNodeScaleStartRadius = 0.1f;
 };
 
 class InputManager {
@@ -119,6 +140,7 @@ public:
                                           bool& mouseWasPressed,
                                           TransformationState& ts,
                                           float lightDir[3],
+                                          const RenderSettings& renderSettings,
                                           const ImVec2& viewportPos, const ImVec2& viewportSize);
 };
 

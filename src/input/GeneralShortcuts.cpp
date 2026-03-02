@@ -15,6 +15,38 @@ void InputManager::processGeneralInput(GLFWwindow* window,
                                        TransformationState& ts) {
     static bool duplicationKeyHandled = false;
     static bool deleteKeyHandled = false;
+    static bool tabToggleHandled = false;
+
+    if (!ImGui::GetIO().WantCaptureKeyboard) {
+        if (glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS && !tabToggleHandled) {
+            tabToggleHandled = true;
+            if (selectedShapes.size() == 1) {
+                const int shapeIndex = selectedShapes[0];
+                if (shapeIndex >= 0 && shapeIndex < static_cast<int>(shapes.size()) &&
+                    shapes[shapeIndex].type == SHAPE_CURVE) {
+                    ts.curveEditMode = !ts.curveEditMode;
+                    ts.curveNodeMoveModeActive = false;
+                    ts.curveNodeMoveConstrained = false;
+                    ts.curveNodeMoveAxis = -1;
+                    if (!ts.curveEditMode) {
+                        ts.curveNodeSelected = false;
+                        ts.curveNodeShapeIndex = -1;
+                        ts.curveNodeIndex = -1;
+                    } else if (shapes[shapeIndex].curveNodes.empty()) {
+                        CurveNode node;
+                        shapes[shapeIndex].curveNodes.push_back(node);
+                        ts.curveNodeSelected = true;
+                        ts.curveNodeShapeIndex = shapeIndex;
+                        ts.curveNodeIndex = 0;
+                    }
+                }
+            }
+        }
+
+        if (glfwGetKey(window, GLFW_KEY_TAB) == GLFW_RELEASE) {
+            tabToggleHandled = false;
+        }
+    }
     if (!ImGui::GetIO().WantCaptureKeyboard) {
         if ((glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) &&
             (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
@@ -75,9 +107,33 @@ void InputManager::processGeneralInput(GLFWwindow* window,
     }
 
     if (!ImGui::GetIO().WantCaptureKeyboard && !selectedShapes.empty()) {
+        if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS &&
+            !ts.translationModeActive && !ts.rotationModeActive && !ts.scaleModeActive &&
+            !ts.mirrorHelperMoveModeActive && !ts.sunLightMoveModeActive && !ts.sunLightHandleDragActive &&
+            !ts.pointLightMoveModeActive && !ts.curveNodeMoveModeActive && !ts.curveNodeScaleModeActive && !deleteKeyHandled &&
+            ts.curveNodeSelected && selectedShapes.size() == 1) {
+            const int shapeIndex = selectedShapes[0];
+            if (shapeIndex >= 0 && shapeIndex < static_cast<int>(shapes.size()) &&
+                shapeIndex == ts.curveNodeShapeIndex &&
+                shapes[shapeIndex].type == SHAPE_CURVE) {
+                Shape& curve = shapes[shapeIndex];
+                if (ts.curveNodeIndex >= 0 &&
+                    ts.curveNodeIndex < static_cast<int>(curve.curveNodes.size()) &&
+                    curve.curveNodes.size() > 1) {
+                    deleteKeyHandled = true;
+                    curve.curveNodes.erase(curve.curveNodes.begin() + ts.curveNodeIndex);
+                    const int newCount = static_cast<int>(curve.curveNodes.size());
+                    ts.curveNodeIndex = std::max(0, std::min(ts.curveNodeIndex, newCount - 1));
+                    ts.curveNodeShapeIndex = shapeIndex;
+                    ts.curveNodeSelected = true;
+                }
+            }
+        }
+
         if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS && !ts.translationModeActive &&
             !ts.rotationModeActive && !ts.scaleModeActive && !ts.mirrorHelperMoveModeActive &&
             !ts.sunLightMoveModeActive && !ts.sunLightHandleDragActive && !ts.pointLightMoveModeActive &&
+            !ts.curveNodeMoveModeActive && !ts.curveNodeScaleModeActive &&
             !deleteKeyHandled) {
             deleteKeyHandled = true;
             std::sort(selectedShapes.begin(), selectedShapes.end(), std::greater<int>());
@@ -87,6 +143,9 @@ void InputManager::processGeneralInput(GLFWwindow* window,
                 }
             }
             selectedShapes.clear();
+            ts.curveNodeSelected = false;
+            ts.curveNodeShapeIndex = -1;
+            ts.curveNodeIndex = -1;
         }
     }
 

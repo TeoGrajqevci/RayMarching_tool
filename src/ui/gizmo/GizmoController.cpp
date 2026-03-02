@@ -138,6 +138,23 @@ void normalizeVec3(float v[3]) {
     }
 }
 
+bool matrixAlmostEqual(const float lhs[16], const float rhs[16], float epsilon) {
+    for (int i = 0; i < 16; ++i) {
+        if (std::fabs(lhs[i] - rhs[i]) > epsilon) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void applyViewMatrixToOrbitAngles(const float view[16], float& camTheta, float& camPhi) {
+    float targetToEye[3] = { view[2], view[6], view[10] };
+    normalizeVec3(targetToEye);
+    camTheta = std::atan2(targetToEye[0], targetToEye[2]);
+    camPhi = std::asin(std::max(-1.0f, std::min(1.0f, targetToEye[1])));
+    camPhi = std::max(-1.57f, std::min(1.57f, camPhi));
+}
+
 void directionFromEulerRadians(const float euler[3], float outDir[3]) {
     const float cx = std::cos(euler[0]);
     const float sx = std::sin(euler[0]);
@@ -338,6 +355,53 @@ void drawPointLightHelperOverlay(ImDrawList* viewportDrawList,
     }
 }
 
+void drawCurveNodeOverlay(ImDrawList* viewportDrawList,
+                          const ImVec2& viewportPos,
+                          const ImVec2& viewportSize,
+                          const std::vector<Shape>& shapes,
+                          const std::vector<int>& selectedShapes,
+                          const TransformationState& transformState,
+                          const float cameraPos[3],
+                          const float cameraTarget[3],
+                          const RenderSettings& renderSettings) {
+    if (!transformState.curveEditMode || selectedShapes.size() != 1) {
+        return;
+    }
+
+    const int selIdx = selectedShapes[0];
+    if (selIdx < 0 || selIdx >= static_cast<int>(shapes.size())) {
+        return;
+    }
+
+    const Shape& shape = shapes[static_cast<std::size_t>(selIdx)];
+    if (shape.type != SHAPE_CURVE) {
+        return;
+    }
+
+    for (int nodeIndex = 0; nodeIndex < static_cast<int>(shape.curveNodes.size()); ++nodeIndex) {
+        const CurveNode& node = shape.curveNodes[static_cast<std::size_t>(nodeIndex)];
+        const float worldPos[3] = {
+            shape.center[0] + node.position[0],
+            shape.center[1] + node.position[1],
+            shape.center[2] + node.position[2]
+        };
+
+        ImVec2 screenPos(0.0f, 0.0f);
+        if (!projectWorldToViewport(worldPos, cameraPos, cameraTarget, renderSettings, viewportPos, viewportSize, screenPos)) {
+            continue;
+        }
+
+        const bool selected = transformState.curveNodeSelected &&
+                              transformState.curveNodeShapeIndex == selIdx &&
+                              transformState.curveNodeIndex == nodeIndex;
+        const ImU32 fillColor = selected ? IM_COL32(255, 160, 70, 255) : IM_COL32(255, 210, 120, 235);
+        const ImU32 ringColor = selected ? IM_COL32(255, 235, 185, 255) : IM_COL32(255, 235, 185, 200);
+        const float radius = selected ? 6.5f : 5.0f;
+        viewportDrawList->AddCircleFilled(screenPos, radius, fillColor, 20);
+        viewportDrawList->AddCircle(screenPos, radius + 2.0f, ringColor, 20, 1.5f);
+    }
+}
+
 } // namespace
 
 void renderViewportGizmo(ImDrawList* viewportDrawList,
@@ -349,6 +413,8 @@ void renderViewportGizmo(ImDrawList* viewportDrawList,
                          float lightDir[3],
                          const float cameraPos[3],
                          const float cameraTarget[3],
+                         float& camTheta,
+                         float& camPhi,
                          const RenderSettings& renderSettings,
                          UiRuntimeState& uiState) {
     if (!uiState.showViewportGizmo) {
@@ -382,6 +448,15 @@ void renderViewportGizmo(ImDrawList* viewportDrawList,
                                     cameraTarget,
                                     renderSettings);
     }
+    drawCurveNodeOverlay(viewportDrawList,
+                         viewportPos,
+                         viewportSize,
+                         shapes,
+                         selectedShapes,
+                         transformState,
+                         cameraPos,
+                         cameraTarget,
+                         renderSettings);
 
     float view[16];
     float projection[16];
@@ -402,6 +477,22 @@ void renderViewportGizmo(ImDrawList* viewportDrawList,
     ImGuizmo::AllowAxisFlip(false);
     ImGuizmo::SetDrawlist(viewportDrawList);
     ImGuizmo::SetRect(viewportPos.x, viewportPos.y, viewportSize.x, viewportSize.y);
+
+    float viewBeforeManipulate[16];
+    std::copy(view, view + 16, viewBeforeManipulate);
+
+    const float orientationSize = clampUiFloat(std::min(viewportSize.x, viewportSize.y) * 0.18f, 72.0f, 128.0f);
+    const float orientationMargin = 14.0f;
+    const ImVec2 orientationPos(viewportPos.x + viewportSize.x - orientationSize - orientationMargin,
+                                viewportPos.y + orientationMargin);
+    ImGuizmo::ViewManipulate(view,
+                             7.0f,
+                             orientationPos,
+                             ImVec2(orientationSize, orientationSize),
+                             IM_COL32(0, 0, 0, 0));
+    if (!matrixAlmostEqual(viewBeforeManipulate, view, 1e-5f)) {
+        applyViewMatrixToOrbitAngles(view, camTheta, camPhi);
+    }
 
     if (transformState.selectedPointLightIndex >= 0 &&
         transformState.selectedPointLightIndex < static_cast<int>(transformState.pointLights.size())) {
@@ -490,6 +581,95 @@ void renderViewportGizmo(ImDrawList* viewportDrawList,
     if (selIdx < 0 || selIdx >= static_cast<int>(shapes.size())) {
         viewportDrawList->PopClipRect();
         return;
+    }
+
+    if (transformState.curveEditMode &&
+        shapes[selIdx].type == SHAPE_CURVE &&
+        transformState.curveNodeSelected &&
+        transformState.curveNodeShapeIndex == selIdx &&
+        transformState.curveNodeIndex >= 0 &&
+        transformState.curveNodeIndex < static_cast<int>(shapes[selIdx].curveNodes.size())) {
+        CurveNode& node = shapes[selIdx].curveNodes[static_cast<std::size_t>(transformState.curveNodeIndex)];
+        float nodeTranslation[3] = {
+            shapes[selIdx].center[0] + node.position[0],
+            shapes[selIdx].center[1] + node.position[1],
+            shapes[selIdx].center[2] + node.position[2]
+        };
+        float nodeRotationDeg[3] = {0.0f, 0.0f, 0.0f};
+        float nodeScale[3] = {1.0f, 1.0f, 1.0f};
+        float nodeModel[16];
+        ImGuizmo::RecomposeMatrixFromComponents(nodeTranslation, nodeRotationDeg, nodeScale, nodeModel);
+
+        ImGuizmo::OPERATION nodeOperation = toGizmoOperation(uiState.gizmoOperation);
+        if (nodeOperation == ImGuizmo::ROTATE) {
+            nodeOperation = ImGuizmo::TRANSLATE;
+        }
+
+        const bool nodeManipulated = ImGuizmo::Manipulate(view,
+                                                          projection,
+                                                          nodeOperation,
+                                                          ImGuizmo::WORLD,
+                                                          nodeModel);
+        const bool nodeUsingGizmo = ImGuizmo::IsUsing();
+
+        if (nodeOperation == ImGuizmo::SCALE) {
+            if (nodeUsingGizmo &&
+                (!uiState.curveNodeScaleDragActive ||
+                 uiState.curveNodeScaleDragShape != selIdx ||
+                 uiState.curveNodeScaleDragNode != transformState.curveNodeIndex)) {
+                uiState.curveNodeScaleDragActive = true;
+                uiState.curveNodeScaleDragShape = selIdx;
+                uiState.curveNodeScaleDragNode = transformState.curveNodeIndex;
+                uiState.curveNodeScaleStartRadius = std::max(node.radius, 0.001f);
+            }
+
+            if (nodeUsingGizmo &&
+                uiState.curveNodeScaleDragActive &&
+                uiState.curveNodeScaleDragShape == selIdx &&
+                uiState.curveNodeScaleDragNode == transformState.curveNodeIndex) {
+                float manipulatedTranslation[3];
+                float manipulatedRotationDeg[3];
+                float manipulatedScale[3];
+                ImGuizmo::DecomposeMatrixToComponents(nodeModel,
+                                                      manipulatedTranslation,
+                                                      manipulatedRotationDeg,
+                                                      manipulatedScale);
+                const float uniformScale = std::max(0.001f,
+                                                    (std::fabs(manipulatedScale[0]) +
+                                                     std::fabs(manipulatedScale[1]) +
+                                                     std::fabs(manipulatedScale[2])) / 3.0f);
+                node.radius = std::max(0.001f, uiState.curveNodeScaleStartRadius * uniformScale);
+            } else if (!nodeUsingGizmo && uiState.curveNodeScaleDragActive) {
+                uiState.curveNodeScaleDragActive = false;
+                uiState.curveNodeScaleDragShape = -1;
+                uiState.curveNodeScaleDragNode = -1;
+            }
+        } else {
+            if (uiState.curveNodeScaleDragActive) {
+                uiState.curveNodeScaleDragActive = false;
+                uiState.curveNodeScaleDragShape = -1;
+                uiState.curveNodeScaleDragNode = -1;
+            }
+
+            if (nodeManipulated) {
+                float manipulatedTranslation[3];
+                float manipulatedRotationDeg[3];
+                float manipulatedScale[3];
+                ImGuizmo::DecomposeMatrixToComponents(nodeModel, manipulatedTranslation, manipulatedRotationDeg, manipulatedScale);
+                node.position[0] = manipulatedTranslation[0] - shapes[selIdx].center[0];
+                node.position[1] = manipulatedTranslation[1] - shapes[selIdx].center[1];
+                node.position[2] = manipulatedTranslation[2] - shapes[selIdx].center[2];
+            }
+        }
+
+        viewportDrawList->PopClipRect();
+        return;
+    }
+
+    if (uiState.curveNodeScaleDragActive) {
+        uiState.curveNodeScaleDragActive = false;
+        uiState.curveNodeScaleDragShape = -1;
+        uiState.curveNodeScaleDragNode = -1;
     }
 
     const bool helperSelectionActive =

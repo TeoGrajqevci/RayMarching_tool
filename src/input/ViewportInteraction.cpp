@@ -3,6 +3,7 @@
 #include <GLFW/glfw3.h>
 
 #include "ImGuizmo.h"
+#include "rmt/RenderSettings.h"
 
 #include <algorithm>
 #include <cmath>
@@ -23,6 +24,7 @@ void InputManager::processMousePickingAndCameraDrag(GLFWwindow* window,
                                                     bool& mouseWasPressed,
                                                     TransformationState& ts,
                                                     float lightDir[3],
+                                                    const RenderSettings& renderSettings,
                                                     const ImVec2& viewportPos,
                                                     const ImVec2& viewportSize) {
     static bool panningMode = false;
@@ -63,6 +65,13 @@ void InputManager::processMousePickingAndCameraDrag(GLFWwindow* window,
         return;
     }
 
+    if (ts.curveNodeMoveModeActive || ts.curveNodeScaleModeActive) {
+        cameraDragging = false;
+        mouseWasPressed = false;
+        panningMode = false;
+        return;
+    }
+
     double viewportX = viewportPos.x;
     double viewportY = viewportPos.y;
     double viewportW = viewportSize.x;
@@ -82,6 +91,87 @@ void InputManager::processMousePickingAndCameraDrag(GLFWwindow* window,
     const bool mouseInViewport = mouseX >= viewportX && mouseX <= (viewportX + viewportW) &&
                                  mouseY >= viewportY && mouseY <= (viewportY + viewportH);
     const bool blockByUiPanel = shouldBlockViewportInput(mouseX, mouseY);
+
+    auto computeOrthoScale = [&]() -> float {
+        const float dx = cameraPos[0] - cameraTarget[0];
+        const float dy = cameraPos[1] - cameraTarget[1];
+        const float dz = cameraPos[2] - cameraTarget[2];
+        const float cameraDistance = std::sqrt(dx * dx + dy * dy + dz * dz);
+        const float safeFovDegrees = std::max(20.0f, std::min(120.0f, renderSettings.cameraFovDegrees));
+        const float halfFovRadians = safeFovDegrees * (3.14159265358979323846f / 180.0f) * 0.5f;
+        return std::max(0.05f, cameraDistance * std::tan(halfFovRadians));
+    };
+
+    auto projectWorldToViewport = [&](const float world[3], ImVec2& outScreen, float& outDepth) -> bool {
+        float forward[3] = {
+            cameraTarget[0] - cameraPos[0],
+            cameraTarget[1] - cameraPos[1],
+            cameraTarget[2] - cameraPos[2]
+        };
+        float fLen = std::sqrt(forward[0] * forward[0] + forward[1] * forward[1] + forward[2] * forward[2]);
+        if (fLen < 1e-6f) {
+            return false;
+        }
+        forward[0] /= fLen;
+        forward[1] /= fLen;
+        forward[2] /= fLen;
+
+        float upDefault[3] = {0.0f, 1.0f, 0.0f};
+        float right[3] = {
+            forward[1] * upDefault[2] - forward[2] * upDefault[1],
+            forward[2] * upDefault[0] - forward[0] * upDefault[2],
+            forward[0] * upDefault[1] - forward[1] * upDefault[0],
+        };
+        float rLen = std::sqrt(right[0] * right[0] + right[1] * right[1] + right[2] * right[2]);
+        if (rLen < 1e-6f) {
+            return false;
+        }
+        right[0] /= rLen;
+        right[1] /= rLen;
+        right[2] /= rLen;
+
+        float up[3] = {
+            right[1] * forward[2] - right[2] * forward[1],
+            right[2] * forward[0] - right[0] * forward[2],
+            right[0] * forward[1] - right[1] * forward[0],
+        };
+
+        const float rel[3] = {
+            world[0] - cameraPos[0],
+            world[1] - cameraPos[1],
+            world[2] - cameraPos[2]
+        };
+
+        const float camX = rel[0] * right[0] + rel[1] * right[1] + rel[2] * right[2];
+        const float camY = rel[0] * up[0] + rel[1] * up[1] + rel[2] * up[2];
+        const float camZ = rel[0] * forward[0] + rel[1] * forward[1] + rel[2] * forward[2];
+        outDepth = camZ;
+
+        const float aspect = std::max(1e-5f, static_cast<float>(viewportW) / std::max(1e-5f, static_cast<float>(viewportH)));
+        float ndcX = 0.0f;
+        float ndcY = 0.0f;
+
+        if (renderSettings.cameraProjectionMode == CAMERA_PROJECTION_ORTHOGRAPHIC) {
+            const float orthoScale = computeOrthoScale();
+            ndcX = camX / std::max(1e-5f, orthoScale * aspect);
+            ndcY = camY / std::max(1e-5f, orthoScale);
+        } else {
+            if (camZ <= 1e-5f) {
+                return false;
+            }
+            const float tanHalfFov = std::tan((renderSettings.cameraFovDegrees * (3.14159265358979323846f / 180.0f)) * 0.5f);
+            ndcX = camX / (camZ * std::max(1e-5f, tanHalfFov * aspect));
+            ndcY = camY / (camZ * std::max(1e-5f, tanHalfFov));
+        }
+
+        if (ndcX < -1.0f || ndcX > 1.0f || ndcY < -1.0f || ndcY > 1.0f) {
+            return false;
+        }
+
+        outScreen.x = static_cast<float>(viewportX) + (ndcX * 0.5f + 0.5f) * static_cast<float>(viewportW);
+        outScreen.y = static_cast<float>(viewportY) + (1.0f - (ndcY * 0.5f + 0.5f)) * static_cast<float>(viewportH);
+        return true;
+    };
 
     auto computePickRay = [&](float outRayDir[3]) -> bool {
         if (!mouseInViewport) {
@@ -281,33 +371,6 @@ void InputManager::processMousePickingAndCameraDrag(GLFWwindow* window,
             return false;
         }
 
-        float rayDir[3];
-        if (!computePickRay(rayDir)) {
-            return false;
-        }
-
-        auto raySphereT = [](const float ro[3], const float rd[3], const float center[3], float radius) -> float {
-            const float ocX = ro[0] - center[0];
-            const float ocY = ro[1] - center[1];
-            const float ocZ = ro[2] - center[2];
-            const float b = 2.0f * (ocX * rd[0] + ocY * rd[1] + ocZ * rd[2]);
-            const float c = ocX * ocX + ocY * ocY + ocZ * ocZ - radius * radius;
-            const float disc = b * b - 4.0f * c;
-            if (disc < 0.0f) {
-                return std::numeric_limits<float>::max();
-            }
-            const float sqrtDisc = std::sqrt(disc);
-            const float t0 = (-b - sqrtDisc) * 0.5f;
-            const float t1 = (-b + sqrtDisc) * 0.5f;
-            if (t0 > 0.0f) {
-                return t0;
-            }
-            if (t1 > 0.0f) {
-                return t1;
-            }
-            return std::numeric_limits<float>::max();
-        };
-
         float sunDir[3] = { lightDir[0], lightDir[1], lightDir[2] };
         const float dirLen = std::sqrt(sunDir[0] * sunDir[0] + sunDir[1] * sunDir[1] + sunDir[2] * sunDir[2]);
         if (dirLen > 1e-6f) {
@@ -336,10 +399,36 @@ void InputManager::processMousePickingAndCameraDrag(GLFWwindow* window,
             ts.sunLightPosition[2] + visualDir[2] * ts.sunLightHandleDistance
         };
 
-        const float tHelper = raySphereT(cameraPos, rayDir, helperCenter, 0.22f);
-        const float tHandle = raySphereT(cameraPos, rayDir, handleCenter, 0.16f);
-        const bool hitHelper = tHelper < std::numeric_limits<float>::max();
-        const bool hitHandle = tHandle < std::numeric_limits<float>::max();
+        ImVec2 helperScreen(0.0f, 0.0f);
+        ImVec2 handleScreen(0.0f, 0.0f);
+        float helperDepth = 0.0f;
+        float handleDepth = 0.0f;
+        const bool helperVisible = projectWorldToViewport(helperCenter, helperScreen, helperDepth);
+        const bool handleVisible = projectWorldToViewport(handleCenter, handleScreen, handleDepth);
+        if (!helperVisible && !handleVisible) {
+            return false;
+        }
+
+        const float helperRadius = ts.sunLightSelected ? 13.0f : 11.0f;
+        const float handleRadius = ts.sunLightHandleDragActive ? 10.0f : 9.0f;
+
+        float helperDist2 = std::numeric_limits<float>::max();
+        float handleDist2 = std::numeric_limits<float>::max();
+        bool hitHelper = false;
+        bool hitHandle = false;
+
+        if (helperVisible) {
+            const float dx = static_cast<float>(mouseX) - helperScreen.x;
+            const float dy = static_cast<float>(mouseY) - helperScreen.y;
+            helperDist2 = dx * dx + dy * dy;
+            hitHelper = helperDist2 <= helperRadius * helperRadius;
+        }
+        if (handleVisible) {
+            const float dx = static_cast<float>(mouseX) - handleScreen.x;
+            const float dy = static_cast<float>(mouseY) - handleScreen.y;
+            handleDist2 = dx * dx + dy * dy;
+            hitHandle = handleDist2 <= handleRadius * handleRadius;
+        }
 
         if (!hitHelper && !hitHandle) {
             return false;
@@ -359,9 +448,12 @@ void InputManager::processMousePickingAndCameraDrag(GLFWwindow* window,
         ts.mirrorHelperMoveModeActive = false;
         ts.mirrorHelperMoveConstrained = false;
         ts.mirrorHelperMoveAxis = -1;
+        ts.curveNodeSelected = false;
+        ts.curveNodeShapeIndex = -1;
+        ts.curveNodeIndex = -1;
         selectedShapes.clear();
 
-        if (hitHandle && (!hitHelper || tHandle <= tHelper)) {
+        if (hitHandle && (!hitHelper || handleDist2 <= helperDist2)) {
             ts.sunLightHandleDragActive = true;
             glfwGetCursorPos(window, &ts.sunLightHandleStartMouseX, &ts.sunLightHandleStartMouseY);
             ts.sunLightHandleStartDirection[0] = visualDir[0];
@@ -379,39 +471,32 @@ void InputManager::processMousePickingAndCameraDrag(GLFWwindow* window,
             return false;
         }
 
-        float rayDir[3];
-        if (!computePickRay(rayDir)) {
-            return false;
-        }
-
-        constexpr float radius = 0.2f;
-        float bestT = std::numeric_limits<float>::max();
+        float bestDist2 = std::numeric_limits<float>::max();
+        float bestDepth = std::numeric_limits<float>::max();
         int bestIndex = -1;
 
         for (int i = 0; i < static_cast<int>(ts.pointLights.size()); ++i) {
             const PointLightState& pointLight = ts.pointLights[static_cast<std::size_t>(i)];
-            const float ocX = cameraPos[0] - pointLight.position[0];
-            const float ocY = cameraPos[1] - pointLight.position[1];
-            const float ocZ = cameraPos[2] - pointLight.position[2];
-            const float b = 2.0f * (ocX * rayDir[0] + ocY * rayDir[1] + ocZ * rayDir[2]);
-            const float c = ocX * ocX + ocY * ocY + ocZ * ocZ - radius * radius;
-            const float disc = b * b - 4.0f * c;
-            if (disc < 0.0f) {
+            ImVec2 pointScreen(0.0f, 0.0f);
+            float pointDepth = 0.0f;
+            if (!projectWorldToViewport(pointLight.position, pointScreen, pointDepth)) {
                 continue;
             }
 
-            const float sqrtDisc = std::sqrt(disc);
-            const float t0 = (-b - sqrtDisc) * 0.5f;
-            const float t1 = (-b + sqrtDisc) * 0.5f;
-            float tCandidate = std::numeric_limits<float>::max();
-            if (t0 > 0.0f) {
-                tCandidate = t0;
-            } else if (t1 > 0.0f) {
-                tCandidate = t1;
+            const bool selected = (ts.selectedPointLightIndex == i);
+            const float hitRadius = selected ? 14.0f : 12.0f;
+            const float dx = static_cast<float>(mouseX) - pointScreen.x;
+            const float dy = static_cast<float>(mouseY) - pointScreen.y;
+            const float dist2 = dx * dx + dy * dy;
+            if (dist2 > hitRadius * hitRadius) {
+                continue;
             }
 
-            if (tCandidate < bestT) {
-                bestT = tCandidate;
+            const bool betterDistance = dist2 + 0.01f < bestDist2;
+            const bool equalDistance = std::fabs(dist2 - bestDist2) <= 0.01f;
+            if (betterDistance || (equalDistance && pointDepth < bestDepth)) {
+                bestDist2 = dist2;
+                bestDepth = pointDepth;
                 bestIndex = i;
             }
         }
@@ -435,7 +520,77 @@ void InputManager::processMousePickingAndCameraDrag(GLFWwindow* window,
         ts.mirrorHelperMoveModeActive = false;
         ts.mirrorHelperMoveConstrained = false;
         ts.mirrorHelperMoveAxis = -1;
+        ts.curveNodeSelected = false;
+        ts.curveNodeShapeIndex = -1;
+        ts.curveNodeIndex = -1;
         selectedShapes.clear();
+        return true;
+    };
+
+    auto trySelectCurveNode = [&]() -> bool {
+        if (!ts.curveEditMode || selectedShapes.size() != 1) {
+            return false;
+        }
+
+        const int shapeIndex = selectedShapes[0];
+        if (shapeIndex < 0 || shapeIndex >= static_cast<int>(shapes.size())) {
+            return false;
+        }
+
+        const Shape& selectedShape = shapes[static_cast<std::size_t>(shapeIndex)];
+        if (selectedShape.type != SHAPE_CURVE || selectedShape.curveNodes.empty()) {
+            return false;
+        }
+
+        int bestNodeIndex = -1;
+        float bestDist2 = std::numeric_limits<float>::max();
+        float bestDepth = std::numeric_limits<float>::max();
+
+        for (int nodeIndex = 0; nodeIndex < static_cast<int>(selectedShape.curveNodes.size()); ++nodeIndex) {
+            const CurveNode& node = selectedShape.curveNodes[static_cast<std::size_t>(nodeIndex)];
+            const float worldPos[3] = {
+                selectedShape.center[0] + node.position[0],
+                selectedShape.center[1] + node.position[1],
+                selectedShape.center[2] + node.position[2]
+            };
+
+            ImVec2 nodeScreen(0.0f, 0.0f);
+            float nodeDepth = 0.0f;
+            if (!projectWorldToViewport(worldPos, nodeScreen, nodeDepth)) {
+                continue;
+            }
+
+            const float hitRadius =
+                (ts.curveNodeSelected && ts.curveNodeShapeIndex == shapeIndex && ts.curveNodeIndex == nodeIndex)
+                ? 13.0f
+                : 11.0f;
+
+            const float dx = static_cast<float>(mouseX) - nodeScreen.x;
+            const float dy = static_cast<float>(mouseY) - nodeScreen.y;
+            const float dist2 = dx * dx + dy * dy;
+            if (dist2 > hitRadius * hitRadius) {
+                continue;
+            }
+
+            const bool betterDistance = dist2 + 0.01f < bestDist2;
+            const bool equalDistance = std::fabs(dist2 - bestDist2) <= 0.01f;
+            if (betterDistance || (equalDistance && nodeDepth < bestDepth)) {
+                bestDist2 = dist2;
+                bestDepth = nodeDepth;
+                bestNodeIndex = nodeIndex;
+            }
+        }
+
+        if (bestNodeIndex < 0) {
+            return false;
+        }
+
+        ts.curveNodeSelected = true;
+        ts.curveNodeShapeIndex = shapeIndex;
+        ts.curveNodeIndex = bestNodeIndex;
+        ts.curveNodeMoveModeActive = false;
+        ts.curveNodeMoveConstrained = false;
+        ts.curveNodeMoveAxis = -1;
         return true;
     };
 
@@ -459,6 +614,11 @@ void InputManager::processMousePickingAndCameraDrag(GLFWwindow* window,
                 } else if (trySelectPointLightHelper()) {
                     cameraDragging = false;
                 } else if (trySelectMirrorHelper()) {
+                    ts.curveNodeSelected = false;
+                    ts.curveNodeShapeIndex = -1;
+                    ts.curveNodeIndex = -1;
+                    cameraDragging = false;
+                } else if (trySelectCurveNode()) {
                     cameraDragging = false;
                 } else {
                     float rayDir[3];
@@ -492,6 +652,18 @@ void InputManager::processMousePickingAndCameraDrag(GLFWwindow* window,
                             ts.pointLightMoveModeActive = false;
                             ts.pointLightMoveConstrained = false;
                             ts.pointLightMoveAxis = -1;
+                            if (!ts.curveEditMode || shapes[hitShape].type != SHAPE_CURVE) {
+                                ts.curveNodeSelected = false;
+                                ts.curveNodeShapeIndex = -1;
+                                ts.curveNodeIndex = -1;
+                            } else {
+                                ts.curveNodeShapeIndex = hitShape;
+                                if (ts.curveNodeIndex < 0 ||
+                                    ts.curveNodeIndex >= static_cast<int>(shapes[hitShape].curveNodes.size())) {
+                                    ts.curveNodeIndex = 0;
+                                }
+                                ts.curveNodeSelected = !shapes[hitShape].curveNodes.empty();
+                            }
                         } else {
                             selectedShapes.clear();
                             ts.mirrorHelperSelected = false;
@@ -509,6 +681,9 @@ void InputManager::processMousePickingAndCameraDrag(GLFWwindow* window,
                             ts.pointLightMoveModeActive = false;
                             ts.pointLightMoveConstrained = false;
                             ts.pointLightMoveAxis = -1;
+                            ts.curveNodeSelected = false;
+                            ts.curveNodeShapeIndex = -1;
+                            ts.curveNodeIndex = -1;
                             cameraDragging = true;
                         }
                     } else {

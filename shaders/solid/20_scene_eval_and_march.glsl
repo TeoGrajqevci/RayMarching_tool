@@ -1,4 +1,4 @@
-SDFResult accumulateSceneFullForShape(vec3 p, int shapeIndex, SDFResult res) {
+SDFResult accumulateSceneFullForShape(vec3 p, vec3 shadingNormal, int shapeIndex, SDFResult res) {
     vec4 t0;
     vec4 t1;
     int blendOp;
@@ -14,7 +14,7 @@ SDFResult accumulateSceneFullForShape(vec3 p, int shapeIndex, SDFResult res) {
     }
 
     ShapeData shape = loadShapeDataFromHeader(shapeIndex, t0, t1);
-    SDFResult candidate = sdfForShape(shape, p);
+    SDFResult candidate = sdfForShape(shape, p, shadingNormal);
 
     if(blendOp == BLEND_SMOOTH_UNION) {
         return opSmoothUnion(candidate, res, smoothness);
@@ -29,27 +29,27 @@ SDFResult accumulateSceneFullForShape(vec3 p, int shapeIndex, SDFResult res) {
         return candidate;
     }
     return res;
-}
+    }
 
-float sceneSDFDistanceLowerBound(vec3 p) {
+    float sceneSDFDistanceLowerBound(vec3 p) {
     float dist = MAX_DIST;
     for(int i = 0; i < shapeCount; ++i) {
         dist = accumulateSceneDistanceLowerBoundForShape(p, i, dist);
     }
 
     return dist;
-}
+    }
 
-float sceneSDFDistanceExact(vec3 p) {
+    float sceneSDFDistanceExact(vec3 p) {
     float dist = MAX_DIST;
     for(int i = 0; i < shapeCount; ++i) {
         dist = accumulateSceneDistanceExactForShape(p, i, dist);
     }
 
     return dist;
-}
+    }
 
-SDFResult sceneSDFFull(vec3 p) {
+    SDFResult sceneSDFFull(vec3 p, vec3 shadingNormal) {
     SDFResult res;
     res.dist = MAX_DIST;
     res.mat.albedo = vec3(0.0);
@@ -59,14 +59,19 @@ SDFResult sceneSDFFull(vec3 p) {
     res.mat.emissionStrength = 0.0;
     res.mat.transmission = 0.0;
     res.mat.ior = 1.5;
+    res.mat.dispersion = 0.0;
+    res.mat.albedoTexIndex = -1.0;
+    res.mat.roughnessTexIndex = -1.0;
+    res.mat.metallicTexIndex = -1.0;
+    res.mat.normalTexIndex = -1.0;
     for(int i = 0; i < shapeCount; ++i) {
-        res = accumulateSceneFullForShape(p, i, res);
+        res = accumulateSceneFullForShape(p, shadingNormal, i, res);
     }
 
     return res;
-}
+    }
 
-vec3 getNormal(vec3 p, float eps) {
+    vec3 getNormal(vec3 p, float eps) {
     const vec3 k1 = vec3(1.0, -1.0, -1.0);
     const vec3 k2 = vec3(-1.0, -1.0, 1.0);
     const vec3 k3 = vec3(-1.0, 1.0, -1.0);
@@ -77,9 +82,9 @@ vec3 getNormal(vec3 p, float eps) {
         k3 * sceneSDFDistanceExact(p + k3 * eps) +
         k4 * sceneSDFDistanceExact(p + k4 * eps);
     return normalize(n);
-}
+    }
 
-bool intersectSceneBounds(vec3 ro, vec3 rd, out float tEnter, out float tExit) {
+    bool intersectSceneBounds(vec3 ro, vec3 rd, out float tEnter, out float tExit) {
     if(uSceneBoundsRadius <= 0.0) {
         tEnter = 0.0;
         tExit = -1.0;
@@ -105,9 +110,9 @@ bool intersectSceneBounds(vec3 ro, vec3 rd, out float tEnter, out float tExit) {
 
     tEnter = max(tEnter, 0.0);
     return true;
-}
+    }
 
-vec3 refineSurfaceCrossing(vec3 ro, vec3 rd, float tNear, float tFar) {
+    vec3 refineSurfaceCrossing(vec3 ro, vec3 rd, float tNear, float tFar) {
     float a = min(tNear, tFar);
     float b = max(tNear, tFar);
     for(int iter = 0; iter < 6; ++iter) {
@@ -120,77 +125,9 @@ vec3 refineSurfaceCrossing(vec3 ro, vec3 rd, float tNear, float tFar) {
         }
     }
     return ro + rd * (0.5 * (a + b));
-}
-
-float softShadow(vec3 ro, vec3 rd, float mint, float maxt, float k, inout int shadowSteps) {
-    float boundsEnter;
-    float boundsExit;
-    if(!intersectSceneBounds(ro, rd, boundsEnter, boundsExit)) {
-        return 1.0;
     }
 
-    float res = 1.0;
-    float t = max(mint, boundsEnter);
-    float maxT = min(maxt, boundsExit);
-    if(t >= maxT) {
-        return 1.0;
-    }
-
-    int shadowLimit = getShadowStepLimit();
-    for(int i = 0; i < 24; ++i) {
-        if(i >= shadowLimit) {
-            break;
-        }
-        shadowSteps += 1;
-        vec3 samplePos = ro + rd * t;
-        float h = MAX_DIST;
-
-        ivec3 cell;
-        int accelStart;
-        int accelCount;
-        bool forceFullScan;
-        bool hasCell = getAccelCellData(samplePos, cell, accelStart, accelCount, forceFullScan);
-        float cellExit = 0.0;
-
-        if(hasCell && !forceFullScan) {
-            cellExit = accelCellExitDistance(samplePos, rd, cell);
-            if(accelCount > 0) {
-                float hLower = sceneSDFDistanceLowerBoundForAccelRange(samplePos, accelStart, accelCount);
-                if(hLower <= ACCEL_EXACT_REFINE_SHADOW_DIST || cellExit <= ACCEL_MIN_CELL_EXIT_REFINE) {
-                    h = sceneSDFDistanceExact(samplePos);
-                } else {
-                    h = hLower;
-                }
-            } else {
-                h = cellExit;
-            }
-        } else {
-            h = sceneSDFDistanceExact(samplePos);
-        }
-
-        float hitEps = getAdaptiveHitEpsilon(t);
-        if(h < 0.0 || abs(h) < hitEps * 0.5) {
-            return 0.0;
-        }
-        float hAbs = abs(h);
-        float overRelax = getSafeOverRelax(hAbs, hitEps);
-        float stepDist = max(hAbs * SPHERE_TRACE_SAFETY * overRelax, hitEps * 0.33);
-        if(hasCell && !forceFullScan) {
-            stepDist = min(stepDist, cellExit + hitEps * 0.5);
-        }
-        res = min(res, k * stepDist / max(t, 0.001));
-        if(res < 0.01) {
-            return 0.0;
-        }
-        t += stepDist;
-        if(t >= maxT) {
-            break;
-        }
-    }
-    return res;
-}
-
-bool marchSceneTransmission(vec3 ro, vec3 rd, out vec3 hitPos, out SDFResult hitRes, inout int transmissionSteps) {
+    bool marchSceneTransmission(vec3 ro, vec3 rd, out vec3 hitPos, out SDFResult hitRes, inout int transmissionSteps) {
     float boundsEnter;
     float boundsExit;
     if(!intersectSceneBounds(ro, rd, boundsEnter, boundsExit)) {
@@ -236,13 +173,15 @@ bool marchSceneTransmission(vec3 ro, vec3 rd, out vec3 hitPos, out SDFResult hit
         float hitEps = getAdaptiveHitEpsilon(t);
         if(abs(dScene) < hitEps) {
             hitPos = pos;
-            hitRes = sceneSDFFull(pos);
+            vec3 shadingNormal = getNormal(pos, getAdaptiveNormalEpsilon(t));
+            hitRes = sceneSDFFull(pos, shadingNormal);
             return true;
         }
 
         if(havePrev && prevD > 0.0 && dScene < 0.0) {
             hitPos = refineSurfaceCrossing(ro, rd, prevT, t);
-            hitRes = sceneSDFFull(hitPos);
+            vec3 shadingNormal = getNormal(hitPos, getAdaptiveNormalEpsilon(t));
+            hitRes = sceneSDFFull(hitPos, shadingNormal);
             return true;
         }
 
@@ -261,9 +200,9 @@ bool marchSceneTransmission(vec3 ro, vec3 rd, out vec3 hitPos, out SDFResult hit
         }
     }
     return false;
-}
+    }
 
-float selectedShapeSDFFor(int selectedIdx, vec3 p) {
+    float selectedShapeSDFFor(int selectedIdx, vec3 p) {
     int shapeIndex = uSelectedIndices[selectedIdx];
     if(shapeIndex < 0 || shapeIndex >= shapeCount) {
         return MAX_DIST;
@@ -276,25 +215,25 @@ float selectedShapeSDFFor(int selectedIdx, vec3 p) {
     float smoothness;
     loadShapeHeader(shapeIndex, t0, t1, blendOp, center, influenceRadius, smoothness);
     ShapeData shape = loadShapeDistanceDataFromHeader(shapeIndex, t0, t1);
-    return evaluateShapeDistance(shape, p);
+    return evaluateShapeDistanceWithDisplacement(shape, p);
+    }
+
+    vec4 rayMarchSelectedFor(int idx, vec3 ro, vec3 rd) {
+const float maxDist = MAX_DIST;
+const float minDist = SURFACE_DIST;
+const int maxIter = 40;
+
+float dist = 0.0;
+float lastD = 1e10;
+float edge = 0.0;
+
+for(int i = 0; i < maxIter; ++i) {
+vec3 pos = ro + rd * dist;
+float dEval = selectedShapeSDFFor(idx, pos);
+if(dEval < minDist) {
+break;
 }
-
-vec4 rayMarchSelectedFor(int idx, vec3 ro, vec3 rd) {
-    const float maxDist = MAX_DIST;
-    const float minDist = SURFACE_DIST;
-    const int maxIter = 40;
-
-    float dist = 0.0;
-    float lastD = 1e10;
-    float edge = 0.0;
-
-    for(int i = 0; i < maxIter; ++i) {
-        vec3 pos = ro + rd * dist;
-        float dEval = selectedShapeSDFFor(idx, pos);
-        if(dEval < minDist) {
-            break;
-        }
-        if(lastD < uOutlineThickness && dEval > lastD + 0.001) {
-            edge = 1.0;
-            break;
-        }
+if(lastD < uOutlineThickness && dEval > lastD + 0.001) {
+edge = 1.0;
+break;
+}
